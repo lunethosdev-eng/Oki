@@ -9,27 +9,21 @@ class SettingsService extends ChangeNotifier {
   late SharedPreferences _p;
   bool ready = false;
 
-  // Theme
   ThemeMode themeMode = ThemeMode.system;
   bool amoled = false;
 
-  // Liquid Glass (experimental, off by default)
   bool liquidGlassEnabled = false;
-  /// system | custom | mono
   String liquidGlassColorMode = 'system';
   Color liquidGlassCustomColor = const Color(0xFF6C9EFF);
   double liquidGlassOpacity = 0.18;
   double liquidGlassBlur = 18;
 
-  // Search / privacy
   bool saveSearchHistory = true;
   bool historyLocal = true;
 
-  // Notifications
   bool notificationSoundEnabled = true;
   String notificationSound = 'chime';
 
-  // Beta flags (real features, gated)
   final Map<String, bool> beta = {
     'listen_together': false,
     'friends_map': false,
@@ -38,10 +32,11 @@ class SettingsService extends ChangeNotifier {
     'dual_session': false,
   };
 
-  // Music API override (owner)
   String? musicApiBaseOverride;
   /// 'color' | 'blur'
   String playerBgMode = 'color';
+  /// header | nav | settings_only
+  String mapEntry = 'nav';
 
   Future<void> load() async {
     _p = await SharedPreferences.getInstance();
@@ -61,6 +56,7 @@ class SettingsService extends ChangeNotifier {
     notificationSound = _p.getString('notif_sound_id') ?? 'chime';
     musicApiBaseOverride = _p.getString('music_api_base');
     playerBgMode = _p.getString('player_bg_mode') ?? 'color';
+    mapEntry = _p.getString('map_entry') ?? 'nav';
     for (final k in beta.keys.toList()) {
       beta[k] = _p.getBool('beta_$k') ?? false;
     }
@@ -71,10 +67,10 @@ class SettingsService extends ChangeNotifier {
   Future<void> _set(String key, Object? value) async {
     if (value is bool) {
       await _p.setBool(key, value);
-    } else if (value is double) {
-      await _p.setDouble(key, value);
     } else if (value is int) {
       await _p.setInt(key, value);
+    } else if (value is double) {
+      await _p.setDouble(key, value);
     } else if (value is String) {
       await _p.setString(key, value);
     } else if (value == null) {
@@ -139,11 +135,14 @@ class SettingsService extends ChangeNotifier {
     musicApiBaseOverride = url?.trim().isEmpty == true ? null : url?.trim();
     await _set('music_api_base', musicApiBaseOverride);
   }
-}
-
 
   Future<void> setPlayerBgMode(String mode) async {
     playerBgMode = mode;
     await _set('player_bg_mode', mode);
-    notifyListeners();
   }
+
+  Future<void> setMapEntry(String v) async {
+    mapEntry = v;
+    await _set('map_entry', v);
+  }
+}
