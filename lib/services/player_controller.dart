@@ -21,11 +21,30 @@ class PlayerController extends ChangeNotifier {
   List<Map<String, dynamic>> queue = [];
   int queueIndex = 0;
   bool isPlaying = false;
+  bool get playing => isPlaying;
   Duration position = Duration.zero;
   Duration duration = Duration.zero;
   /// 0 off, 1 all, 2 one
   int repeatMode = 0;
   bool shuffle = false;
+
+  
+  /// Alias used by Search / Artist screens
+  Future<void> play(Map<String, dynamic> song,
+      {List<Map<String, dynamic>>? asQueue, int? index}) async {
+    if (asQueue != null && asQueue.isNotEmpty) {
+      queue = List.from(asQueue);
+      if (index != null && index >= 0 && index < queue.length) {
+        queueIndex = index;
+        song = queue[index];
+      } else {
+        queueIndex = queue.indexWhere((s) =>
+            (s['id'] ?? s['title']) == (song['id'] ?? song['title']));
+        if (queueIndex < 0) queueIndex = 0;
+      }
+    }
+    await playSong(song, asQueue: asQueue);
+  }
 
   Future<void> playSong(Map<String, dynamic> song,
       {List<Map<String, dynamic>>? asQueue}) async {
