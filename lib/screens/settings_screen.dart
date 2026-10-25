@@ -146,6 +146,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const SizedBox(height: 20),
               _h('Beta · funciones reales'),
+              
+              _h('Player'),
+              ListTile(
+                title: const Text('Fondo del player'),
+                subtitle: Text(s.playerBgMode == 'blur' ? 'Blur del cover' : 'Colores del cover'),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: SegmentedButton<String>(
+                  segments: const [
+                    ButtonSegment(value: 'color', label: Text('Colores'), icon: Icon(Icons.palette_outlined)),
+                    ButtonSegment(value: 'blur', label: Text('Blur'), icon: Icon(Icons.blur_on)),
+                  ],
+                  selected: {s.playerBgMode},
+                  onSelectionChanged: (v) => s.setPlayerBgMode(v.first),
+                ),
+              ),
+              const SizedBox(height: 16),
               for (final e in s.beta.entries)
                 SwitchListTile(
                   title: Text(_betaLabel(e.key)),
