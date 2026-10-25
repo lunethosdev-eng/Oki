@@ -40,6 +40,8 @@ class SettingsService extends ChangeNotifier {
 
   // Music API override (owner)
   String? musicApiBaseOverride;
+  /// 'color' | 'blur'
+  String playerBgMode = 'color';
 
   Future<void> load() async {
     _p = await SharedPreferences.getInstance();
@@ -58,6 +60,7 @@ class SettingsService extends ChangeNotifier {
     notificationSoundEnabled = _p.getBool('notif_sound') ?? true;
     notificationSound = _p.getString('notif_sound_id') ?? 'chime';
     musicApiBaseOverride = _p.getString('music_api_base');
+    playerBgMode = _p.getString('player_bg_mode') ?? 'color';
     for (final k in beta.keys.toList()) {
       beta[k] = _p.getBool('beta_$k') ?? false;
     }
@@ -137,3 +140,10 @@ class SettingsService extends ChangeNotifier {
     await _set('music_api_base', musicApiBaseOverride);
   }
 }
+
+
+  Future<void> setPlayerBgMode(String mode) async {
+    playerBgMode = mode;
+    await _set('player_bg_mode', mode);
+    notifyListeners();
+  }
