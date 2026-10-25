@@ -26,8 +26,6 @@ dependencies:
   connectivity_plus: ^6.1.0
   url_launcher: ^6.3.1
   image_picker: ^1.1.2
-  # v8+ = Android embedding v2 only (fixes Registrar / cannot find symbol)
-  file_picker: ^8.1.7
   dynamic_color: ^1.7.0
   flutter_animate: ^4.5.2
   intl: ^0.19.0
