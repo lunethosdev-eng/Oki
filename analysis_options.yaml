@@ -1,4 +1,12 @@
 include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  exclude:
+    - "**/*.g.dart"
+  errors:
+    # don't fail CI on deprecation infos
+    deprecated_member_use: ignore
+
 linter:
   rules:
     prefer_const_constructors: false
