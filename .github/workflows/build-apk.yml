@@ -29,10 +29,8 @@ jobs:
       - name: Regenerate Android (Flutter embedding)
         run: |
           set -e
-          # Remove incomplete android host — force a valid Flutter project
           rm -rf android
           flutter create . --project-name pokke --org com.pokke --platforms=android
-          # Fix default test that references MyApp (if recreated)
           if [ -f test/widget_test.dart ]; then
             cat > test/widget_test.dart << 'TESTEOF'
           import 'package:flutter_test/flutter_test.dart';
@@ -46,13 +44,30 @@ jobs:
           TESTEOF
           fi
 
-      - name: Patch AndroidManifest (permissions + TV)
+      - name: Force compileSdk 36 + patch manifest
         run: |
           set -e
-          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          # Force compileSdk / targetSdk high enough for modern plugins
+          APP_GRADLE="android/app/build.gradle"
+          if [ -f "$APP_GRADLE" ]; then
+            # Groovy DSL
+            sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/' "$APP_GRADLE" || true
+            sed -i 's/compileSdk flutter.compileSdkVersion/compileSdk 36/' "$APP_GRADLE" || true
+            sed -i 's/targetSdk = flutter.targetSdkVersion/targetSdk = 35/' "$APP_GRADLE" || true
+            sed -i 's/targetSdk flutter.targetSdkVersion/targetSdk 35/' "$APP_GRADLE" || true
+          fi
+          # Kotlin DSL variant
+          APP_KTS="android/app/build.gradle.kts"
+          if [ -f "$APP_KTS" ]; then
+            sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/' "$APP_KTS" || true
+            sed -i 's/targetSdk = flutter.targetSdkVersion/targetSdk = 35/' "$APP_KTS" || true
+          fi
           python3 << 'PY'
           from pathlib import Path
+          import re
           p = Path("android/app/src/main/AndroidManifest.xml")
+          if not p.exists():
+              raise SystemExit(0)
           t = p.read_text()
           perms = """
               <uses-permission android:name="android.permission.INTERNET"/>
@@ -65,15 +80,7 @@ jobs:
               <uses-feature android:name="android.hardware.touchscreen" android:required="false"/>
           """
           if "FOREGROUND_SERVICE_MEDIA_PLAYBACK" not in t:
-              t = t.replace("<manifest", "<manifest", 1)
-              # insert after <manifest ...>
-              import re
-              t = re.sub(
-                  r"(<manifest[^>]*>)",
-                  r"\1\n" + perms,
-                  t,
-                  count=1,
-              )
+              t = re.sub(r"(<manifest[^>]*>)", r"\1\n" + perms, t, count=1)
           if "LEANBACK_LAUNCHER" not in t and "android.intent.category.LAUNCHER" in t:
               t = t.replace(
                   """<category android:name="android.intent.category.LAUNCHER"/>
@@ -85,11 +92,13 @@ jobs:
                   <category android:name="android.intent.category.LEANBACK_LAUNCHER"/>
               </intent-filter>""",
               )
-          if 'android:usesCleartextTraffic' not in t:
+          if "usesCleartextTraffic" not in t:
               t = t.replace("<application", '<application android:usesCleartextTraffic="true"', 1)
           p.write_text(t)
-          print("manifest patched")
+          print("manifest + compileSdk patched")
           PY
+          echo "--- app build.gradle ---"
+          cat android/app/build.gradle 2>/dev/null || cat android/app/build.gradle.kts
 
       - name: Pub get
         run: flutter pub get
