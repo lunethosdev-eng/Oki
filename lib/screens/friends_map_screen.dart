@@ -1,9 +1,13 @@
-import 'dart:math';
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:pokke/services/settings_service.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:pokke/services/supabase_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-/// Beta · friends map (privacy + battery + listen stats).
-/// 3D-style perspective plane; real GPS/presence comes next via Realtime.
+/// Real-world map. Friends come from Kokoro `friendships` + `presence`.
+/// Privacy: private | friends | best_friends
 class FriendsMapScreen extends StatefulWidget {
   const FriendsMapScreen({super.key});
   @override
@@ -11,206 +15,363 @@ class FriendsMapScreen extends StatefulWidget {
 }
 
 class _FriendsMapScreenState extends State<FriendsMapScreen> {
-  /// private | friends | best_friends
+  final _map = MapController();
   String _privacy = 'best_friends';
+  LatLng? _me;
+  int? _battery;
+  List<_FriendPin> _friends = [];
+  StreamSubscription<Position>? _posSub;
+  bool _loading = true;
+  String? _error;
 
-  final _friends = [
-    _Friend('Aya', 0.32, 0.28, 78, 142, 'From The Start', 3.2),
-    _Friend('Leo', 0.62, 0.42, 54, 89, 'Too Little, Too Late', 1.1),
-    _Friend('Mika', 0.45, 0.58, 91, 210, 'Let You Break My Heart Again', 5.4),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _bootstrap();
+  }
+
+  @override
+  void dispose() {
+    _posSub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _bootstrap() async {
+    final p = await SharedPreferences.getInstance();
+    _privacy = p.getString('map_privacy') ?? 'best_friends';
+    await _ensurePermission();
+    await _loadFriends();
+    await _startLocation();
+    if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _ensurePermission() async {
+    var perm = await Geolocator.checkPermission();
+    if (perm == LocationPermission.denied) {
+      perm = await Geolocator.requestPermission();
+    }
+    if (perm == LocationPermission.deniedForever ||
+        perm == LocationPermission.denied) {
+      setState(() => _error = 'Permiso de ubicación denegado');
+    }
+  }
+
+  Future<void> _startLocation() async {
+    try {
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
+      _me = LatLng(pos.latitude, pos.longitude);
+      _publishPresence();
+      _posSub = Geolocator.getPositionStream(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 25,
+        ),
+      ).listen((p) {
+        setState(() => _me = LatLng(p.latitude, p.longitude));
+        _publishPresence();
+      });
+    } catch (e) {
+      setState(() => _error = 'No se pudo obtener GPS: $e');
+    }
+  }
+
+  Future<void> _publishPresence() async {
+    if (_me == null || !SupabaseService.isLoggedIn || SupabaseService.isGuest) {
+      return;
+    }
+    if (_privacy == 'private') return;
+    try {
+      await SupabaseService.kokoro.from('presence').upsert({
+        'user_id': SupabaseService.currentUser!.id,
+        'lat': _me!.latitude,
+        'lng': _me!.longitude,
+        'privacy': _privacy,
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _loadFriends() async {
+    if (!SupabaseService.isLoggedIn || SupabaseService.isGuest) {
+      setState(() => _friends = []);
+      return;
+    }
+    try {
+      // friendships where I am user_id
+      final rows = await SupabaseService.kokoro
+          .from('friendships')
+          .select('friend_id, is_best')
+          .eq('user_id', SupabaseService.currentUser!.id);
+      final list = List<Map<String, dynamic>>.from(rows as List);
+      final pins = <_FriendPin>[];
+      for (final f in list) {
+        if (_privacy == 'best_friends' && f['is_best'] != true) continue;
+        final fid = f['friend_id']?.toString();
+        if (fid == null) continue;
+        try {
+          final pres = await SupabaseService.kokoro
+              .from('presence')
+              .select()
+              .eq('user_id', fid)
+              .maybeSingle();
+          final prof = await SupabaseService.kokoro
+              .from('profiles')
+              .select()
+              .eq('id', fid)
+              .maybeSingle();
+          if (pres == null) continue;
+          final lat = (pres['lat'] as num?)?.toDouble();
+          final lng = (pres['lng'] as num?)?.toDouble();
+          if (lat == null || lng == null) continue;
+          // respect their privacy
+          final their = pres['privacy']?.toString() ?? 'friends';
+          if (their == 'private') continue;
+          if (their == 'best_friends' && f['is_best'] != true) continue;
+          pins.add(_FriendPin(
+            id: fid,
+            name: prof?['display_name']?.toString() ??
+                prof?['username']?.toString() ??
+                'Amigo',
+            avatar: prof?['avatar_url']?.toString(),
+            lat: lat,
+            lng: lng,
+            battery: (pres['battery'] as num?)?.toInt(),
+            song: pres['now_playing']?.toString(),
+            listenMin: (pres['listen_min'] as num?)?.toDouble() ?? 0,
+          ));
+        } catch (_) {}
+      }
+      if (mounted) setState(() => _friends = pins);
+    } catch (_) {
+      if (mounted) setState(() => _friends = []);
+    }
+  }
+
+  Future<void> _setPrivacy(String v) async {
+    setState(() => _privacy = v);
+    final p = await SharedPreferences.getInstance();
+    await p.setString('map_privacy', v);
+    await _publishPresence();
+  }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final center = _me ?? const LatLng(13.6929, -89.2182); // SV default
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Mapa de amigos'),
         actions: [
           PopupMenuButton<String>(
             initialValue: _privacy,
-            onSelected: (v) => setState(() => _privacy = v),
+            onSelected: _setPrivacy,
             itemBuilder: (_) => const [
-              PopupMenuItem(value: 'private', child: Text('Privado (nadie)')),
-              PopupMenuItem(value: 'best_friends', child: Text('Solo mejores amigos')),
-              PopupMenuItem(value: 'friends', child: Text('Todos los amigos')),
+              PopupMenuItem(
+                  value: 'private', child: Text('Privado (nadie)')),
+              PopupMenuItem(
+                  value: 'best_friends',
+                  child: Text('Solo mejores amigos')),
+              PopupMenuItem(
+                  value: 'friends', child: Text('Todos mis amigos')),
             ],
-            icon: const Icon(Icons.visibility_outlined),
+            icon: const Icon(Icons.privacy_tip_outlined),
+          ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () async {
+              await _loadFriends();
+              await _startLocation();
+            },
           ),
         ],
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-            child: Text(
-              _privacy == 'private'
-                  ? 'Tu ubicación está oculta para todos.'
-                  : _privacy == 'best_friends'
-                      ? 'Solo mejores amigos ven tu ubicación real.'
-                      : 'Todos tus amigos pueden verte en el mapa.',
-              style: TextStyle(color: cs.onSurface.withOpacity(0.55), fontSize: 13),
-            ),
-          ),
-          Expanded(
-            child: LayoutBuilder(
-              builder: (context, c) {
-                return GestureDetector(
-                  onTapUp: (d) {
-                    // tap friend markers
-                    for (final f in _friends) {
-                      final x = f.nx * c.maxWidth;
-                      final y = f.ny * c.maxHeight;
-                      if ((d.localPosition.dx - x).abs() < 36 &&
-                          (d.localPosition.dy - y).abs() < 36) {
-                        _showFriend(f);
-                        break;
-                      }
-                    }
-                  },
-                  child: CustomPaint(
-                    size: Size(c.maxWidth, c.maxHeight),
-                    painter: _MapPainter(cs, _friends),
-                    child: Stack(
-                      children: [
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : Stack(
+              children: [
+                FlutterMap(
+                  mapController: _map,
+                  options: MapOptions(
+                    initialCenter: center,
+                    initialZoom: 13,
+                    minZoom: 3,
+                    maxZoom: 18,
+                  ),
+                  children: [
+                    TileLayer(
+                      urlTemplate:
+                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      userAgentPackageName: 'com.pokke.app',
+                    ),
+                    MarkerLayer(
+                      markers: [
+                        if (_me != null)
+                          Marker(
+                            point: _me!,
+                            width: 44,
+                            height: 44,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: cs.primary,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                    color: Colors.white, width: 3),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: cs.primary.withOpacity(0.4),
+                                    blurRadius: 12,
+                                  )
+                                ],
+                              ),
+                              child: const Icon(Icons.person,
+                                  color: Colors.white, size: 22),
+                            ),
+                          ),
                         for (final f in _friends)
-                          Positioned(
-                            left: f.nx * c.maxWidth - 28,
-                            top: f.ny * c.maxHeight - 28,
-                            child: Column(
-                              children: [
-                                CircleAvatar(
-                                  radius: 22,
-                                  backgroundColor: cs.primary.withOpacity(0.25),
-                                  child: Text(f.name[0],
-                                      style: TextStyle(
-                                          fontWeight: FontWeight.w800,
-                                          color: cs.primary)),
-                                ),
-                                Container(
-                                  margin: const EdgeInsets.only(top: 4),
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: cs.surface.withOpacity(0.9),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text('${f.battery}%',
-                                      style: const TextStyle(fontSize: 10)),
-                                ),
-                              ],
+                          Marker(
+                            point: LatLng(f.lat, f.lng),
+                            width: 52,
+                            height: 52,
+                            child: GestureDetector(
+                              onTap: () => _showFriend(f),
+                              child: CircleAvatar(
+                                backgroundImage: f.avatar != null &&
+                                        f.avatar!.startsWith('http')
+                                    ? NetworkImage(f.avatar!)
+                                    : null,
+                                child: f.avatar == null
+                                    ? Text(f.name.characters.first)
+                                    : null,
+                              ),
                             ),
                           ),
                       ],
                     ),
+                  ],
+                ),
+                if (_error != null)
+                  Positioned(
+                    left: 16,
+                    right: 16,
+                    top: 12,
+                    child: Material(
+                      color: cs.errorContainer,
+                      borderRadius: BorderRadius.circular(12),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Text(_error!,
+                            style: TextStyle(color: cs.onErrorContainer)),
+                      ),
+                    ),
                   ),
-                );
-              },
+                Positioned(
+                  left: 16,
+                  right: 16,
+                  bottom: 24,
+                  child: Material(
+                    elevation: 4,
+                    borderRadius: BorderRadius.circular(14),
+                    color: cs.surface.withOpacity(0.95),
+                    child: Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Text(
+                        _privacy == 'private'
+                            ? 'Tu ubicación es privada. Nadie la ve.'
+                            : 'Compartes ubicación solo con ${_privacy == 'best_friends' ? 'mejores amigos' : 'amigos'} (ID único).',
+                        style: TextStyle(
+                            fontSize: 13,
+                            color: cs.onSurface.withOpacity(0.75)),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          if (_me != null) {
+            _map.move(_me!, 15);
+          }
+        },
+        child: const Icon(Icons.my_location),
       ),
     );
   }
 
-  void _showFriend(_Friend f) {
-    final cs = Theme.of(context).colorScheme;
+  void _showFriend(_FriendPin f) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: cs.surfaceContainerHighest,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      showDragHandle: true,
       builder: (_) => Padding(
-        padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(f.name,
-                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 12),
-            _row(Icons.battery_std, 'Batería ${f.battery}%'),
-            _row(Icons.music_note, '${f.songsListened} canciones escuchadas'),
-            _row(Icons.timer_outlined, '${f.hours.toStringAsFixed(1)} h de escucha'),
-            _row(Icons.headphones, 'Ahora: ${f.nowPlaying}'),
-            const SizedBox(height: 8),
-            Text('Reaccionar a su sesión',
-                style: TextStyle(color: cs.onSurface.withOpacity(0.5))),
-            const SizedBox(height: 8),
             Row(
               children: [
-                for (final e in ['🔥', '💜', '🎧', '✨'])
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: ActionChip(
-                      label: Text(e, style: const TextStyle(fontSize: 18)),
-                      onPressed: () => Navigator.pop(context),
-                    ),
+                CircleAvatar(
+                  radius: 28,
+                  backgroundImage: f.avatar != null
+                      ? NetworkImage(f.avatar!)
+                      : null,
+                  child: f.avatar == null ? Text(f.name[0]) : null,
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(f.name,
+                          style: const TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.w800)),
+                      if (f.battery != null)
+                        Text('🔋 ${f.battery}%',
+                            style: const TextStyle(fontSize: 13)),
+                    ],
                   ),
+                ),
               ],
             ),
+            const SizedBox(height: 14),
+            if (f.song != null) Text('Escuchando: ${f.song}'),
+            Text('Tiempo escuchando: ${f.listenMin.toStringAsFixed(1)} min'),
+            Text('ID: ${f.id}',
+                style: TextStyle(
+                    fontSize: 11,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withOpacity(0.4))),
           ],
         ),
       ),
     );
   }
-
-  Widget _row(IconData i, String t) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Row(children: [
-          Icon(i, size: 20),
-          const SizedBox(width: 10),
-          Expanded(child: Text(t)),
-        ]),
-      );
 }
 
-class _Friend {
+class _FriendPin {
+  final String id;
   final String name;
-  final double nx, ny;
-  final int battery, songsListened;
-  final String nowPlaying;
-  final double hours;
-  _Friend(this.name, this.nx, this.ny, this.battery, this.songsListened,
-      this.nowPlaying, this.hours);
-}
-
-class _MapPainter extends CustomPainter {
-  final ColorScheme cs;
-  final List<_Friend> friends;
-  _MapPainter(this.cs, this.friends);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final bg = Paint()..color = cs.surface;
-    canvas.drawRect(Offset.zero & size, bg);
-    // perspective grid
-    final grid = Paint()
-      ..color = cs.primary.withOpacity(0.12)
-      ..strokeWidth = 1;
-    final horizon = size.height * 0.22;
-    for (var i = 0; i < 12; i++) {
-      final t = i / 11;
-      final y = horizon + (size.height - horizon) * pow(t, 1.4);
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), grid);
-    }
-    for (var i = -8; i <= 8; i++) {
-      final x0 = size.width / 2 + i * 40;
-      canvas.drawLine(
-          Offset(size.width / 2, horizon), Offset(x0 * 1.8 - size.width * 0.4, size.height), grid);
-    }
-    // soft glow nodes
-    for (final f in friends) {
-      final p = Offset(f.nx * size.width, f.ny * size.height);
-      canvas.drawCircle(
-          p,
-          40,
-          Paint()
-            ..color = cs.primary.withOpacity(0.08)
-            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18));
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+  final String? avatar;
+  final double lat;
+  final double lng;
+  final int? battery;
+  final String? song;
+  final double listenMin;
+  _FriendPin({
+    required this.id,
+    required this.name,
+    this.avatar,
+    required this.lat,
+    required this.lng,
+    this.battery,
+    this.song,
+    this.listenMin = 0,
+  });
 }
