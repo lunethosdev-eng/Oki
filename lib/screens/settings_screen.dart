@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pokke/services/settings_service.dart';
 import 'package:pokke/services/supabase_service.dart';
 import 'package:audioplayers/audioplayers.dart';
@@ -126,12 +125,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               SwitchListTile(
                 title: const Text('Sonido de notificación'),
                 value: s.notificationSoundEnabled,
-                onChanged: (v) async {
-                  s.notificationSoundEnabled = v;
-                  final p = await SharedPreferences.getInstance();
-                  await p.setBool('notif_sound', v);
-                  s.notifyListeners();
-                },
+                onChanged: s.setNotificationSoundEnabled,
               ),
               Wrap(
                 spacing: 8,
