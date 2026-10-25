@@ -15,6 +15,9 @@ import 'package:pokke/pages/music_player_page.dart';
 import 'package:pokke/widgets/player_route.dart';
 import 'package:pokke/screens/settings_screen.dart';
 import 'package:pokke/screens/profile_screen.dart';
+import 'package:pokke/screens/chat_list_screen.dart';
+import 'package:pokke/screens/friends_map_screen.dart';
+import 'package:pokke/screens/listen_together_screen.dart';
 
 /// One shell — phone (bottom nav) / tablet·desktop·TV (sidebar / lean-back).
 class AdaptiveShell extends StatefulWidget {
@@ -100,6 +103,18 @@ class _AdaptiveShellState extends State<AdaptiveShell>
     return false;
   }
 
+  void _openChat() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const ChatListScreen()),
+    );
+  }
+
+  void _openMap() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const FriendsMapScreen()),
+    );
+  }
+
   void _go(int i) {
     HapticFeedback.selectionClick();
     setState(() => _index = i);
@@ -151,7 +166,10 @@ class _AdaptiveShellState extends State<AdaptiveShell>
         final t = Curves.easeInOutCubicEmphasized.transform(_collapseCtrl.value);
         final s = Curves.easeOutBack.transform(_searchDetachCtrl.value);
         // Main pill items when collapsed: Home + Library
+        final settings = SettingsService.instance;
         final mainItems = _collapsed ? const [0, 3] : const [0, 1, 2, 3, 4];
+        final showChat = settings.flag('private_chat');
+        final showMap = settings.flag('friends_map');
 
         return Padding(
           padding: EdgeInsets.fromLTRB(
