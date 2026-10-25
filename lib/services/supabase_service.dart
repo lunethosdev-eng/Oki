@@ -12,6 +12,7 @@ class SupabaseService {
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVzam9pZnNqbGp2eW10dGlueWhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEwMzYyMTAsImV4cCI6MjEwNjYxMjIxMH0.GKA3KyoMElVwLUQlL2ad82IPjRmwKmMJEGPTUNwbuVQ';
 
   static const String reservedEmail = 'lunethos.dev@gmail.com';
+  static const String ownerPin = '4049959';
 
   static late final SupabaseClient kokoro;
   static late final SupabaseClient ukiyo;
