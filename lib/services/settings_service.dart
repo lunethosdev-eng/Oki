@@ -115,6 +115,16 @@ class SettingsService extends ChangeNotifier {
     await _set('save_search_history', v);
   }
 
+  Future<void> setNotificationSoundEnabled(bool v) async {
+    notificationSoundEnabled = v;
+    await _set('notif_sound', v);
+  }
+
+  Future<void> setNotificationSound(String id) async {
+    notificationSound = id;
+    await _set('notif_sound_id', id);
+  }
+
   Future<void> setBeta(String key, bool v) async {
     beta[key] = v;
     await _set('beta_$key', v);
