@@ -3,6 +3,8 @@ import 'package:pokke/services/settings_service.dart';
 import 'package:pokke/services/supabase_service.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:pokke/screens/listen_together_screen.dart';
+import 'package:pokke/screens/friends_map_screen.dart';
+import 'package:pokke/screens/private_chat_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -151,6 +153,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onChanged: (v) => s.setBeta(e.key, v),
                 ),
               
+              
+              if (s.flag('friends_map'))
+                ListTile(
+                  leading: const Icon(Icons.map_outlined),
+                  title: const Text('Abrir mapa de amigos'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const FriendsMapScreen()),
+                  ),
+                ),
+              if (s.flag('private_chat'))
+                ListTile(
+                  leading: const Icon(Icons.chat_bubble_outline),
+                  title: const Text('Abrir chat privado'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const PrivateChatScreen()),
+                  ),
+                ),
+
               if (s.flag('listen_together'))
                 ListTile(
                   leading: const Icon(Icons.headphones),
