@@ -26,6 +26,11 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Ensure Android platform files
+        run: |
+          flutter create . --project-name pokke --org com.pokke --platforms=android
+          # keep our sources; flutter create does not overwrite lib/ or existing kotlin if present
+
       - name: Pub get
         run: flutter pub get
 
