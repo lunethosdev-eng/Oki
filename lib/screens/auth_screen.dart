@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:pokke/services/supabase_service.dart';
 import 'package:pokke/adaptive/adaptive_shell.dart';
+import 'package:pokke/adaptive/breakpoints.dart';
+import 'package:pokke/screens/device_link_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -59,6 +62,28 @@ class _AuthScreenState extends State<AuthScreen> {
         MaterialPageRoute(builder: (_) => const AdaptiveShell(guest: true)));
   }
 
+  Future<void> _support() async {
+    final uri = Uri(
+      scheme: 'mailto',
+      path: 'lunethos.dev@gmail.com',
+      queryParameters: {
+        'subject': 'Pokke soporte',
+        'body': 'Hola, necesito ayuda con Pokke:\n\n',
+      },
+    );
+    await launchUrl(uri);
+  }
+
+  void _linkDevice() {
+    final isTv = Breakpoints.of(context) == PokkeFormFactor.tv;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => DeviceLinkScreen(asTvHost: isTv),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _email.dispose();
@@ -72,9 +97,40 @@ class _AuthScreenState extends State<AuthScreen> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            onSelected: (v) {
+              if (v == 'support') _support();
+              if (v == 'link') _linkDevice();
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: 'support',
+                child: ListTile(
+                  leading: Icon(Icons.help_outline),
+                  title: Text('Soporte / Ayuda'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              PopupMenuItem(
+                value: 'link',
+                child: ListTile(
+                  leading: Icon(Icons.cast_connected_outlined),
+                  title: Text('Vincular dispositivo'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(28, 40, 28, 24),
+          padding: const EdgeInsets.fromLTRB(28, 8, 28, 24),
           children: [
             Image.asset('assets/logo/pokke_logo.png',
                 width: 72,
