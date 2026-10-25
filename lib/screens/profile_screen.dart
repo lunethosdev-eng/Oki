@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:pokke/services/supabase_service.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:pokke/screens/profile_customize_screen.dart';
+import 'package:pokke/screens/friends_map_screen.dart';
+import 'package:pokke/screens/private_chat_screen.dart';
+import 'package:pokke/services/settings_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -87,8 +91,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
             title: const Text('Personalizar perfil'),
             subtitle: const Text('Stickers, banner, theme'),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () {},
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ProfileCustomizeScreen()),
+              );
+            },
           ),
+          if (SettingsService.instance.flag('friends_map'))
+            ListTile(
+              leading: const Icon(Icons.map_outlined),
+              title: const Text('Mapa de amigos'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const FriendsMapScreen()),
+              ),
+            ),
+          if (SettingsService.instance.flag('private_chat'))
+            ListTile(
+              leading: const Icon(Icons.chat_bubble_outline),
+              title: const Text('Chat privado'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const PrivateChatScreen()),
+              ),
+            ),
           if (SupabaseService.isLoggedIn && !SupabaseService.isGuest)
             ListTile(
               leading: const Icon(Icons.logout),
