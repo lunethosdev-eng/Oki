@@ -1,11 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:pokke/services/lyrics_service.dart';
 import 'package:pokke/services/player_controller.dart';
+import 'package:pokke/services/settings_service.dart';
 
 class KaraokeLyrics extends StatefulWidget {
   final String title;
   final String artist;
-  const KaraokeLyrics({super.key, required this.title, required this.artist});
+  final bool expanded;
+  final VoidCallback? onExpandToggle;
+  const KaraokeLyrics({
+    super.key,
+    required this.title,
+    required this.artist,
+    this.expanded = false,
+    this.onExpandToggle,
+  });
 
   @override
   State<KaraokeLyrics> createState() => _KaraokeLyricsState();
@@ -14,6 +23,7 @@ class KaraokeLyrics extends StatefulWidget {
 class _KaraokeLyricsState extends State<KaraokeLyrics> {
   List<({double t, String line})> _lines = [];
   String? _plain;
+  String? _translation;
   bool _loading = true;
   final _scroll = ScrollController();
 
@@ -44,6 +54,7 @@ class _KaraokeLyricsState extends State<KaraokeLyrics> {
       _loading = true;
       _lines = [];
       _plain = null;
+      _translation = null;
     });
     final raw = await LyricsService.instance.fetch(
       title: widget.title,
@@ -66,6 +77,11 @@ class _KaraokeLyricsState extends State<KaraokeLyrics> {
         _plain = raw;
       }
     });
+    // Translation placeholder — AI path when beta karaoke on
+    if (SettingsService.instance.flag('karaoke_ai')) {
+      // Real AI translation can plug Groq/OpenRouter here
+      setState(() => _translation = null);
+    }
   }
 
   void _onTick() {
@@ -74,10 +90,10 @@ class _KaraokeLyricsState extends State<KaraokeLyrics> {
     final pos = PlayerController.instance.position.inMilliseconds / 1000.0;
     final i = _activeIndex(pos);
     if (i >= 0 && _scroll.hasClients) {
-      final target = (i * 36.0) - 40;
+      final target = (i * (widget.expanded ? 44.0 : 36.0)) - 48;
       _scroll.animateTo(
         target.clamp(0.0, _scroll.position.maxScrollExtent),
-        duration: const Duration(milliseconds: 280),
+        duration: const Duration(milliseconds: 320),
         curve: Curves.easeOutCubic,
       );
     }
@@ -99,41 +115,79 @@ class _KaraokeLyricsState extends State<KaraokeLyrics> {
       return const Center(child: CircularProgressIndicator(strokeWidth: 2));
     }
     if (_plain != null && _lines.isEmpty) {
-      return SingleChildScrollView(
-        padding: const EdgeInsets.all(12),
-        child: Text(_plain!,
-            style: TextStyle(
-                color: cs.onSurface.withOpacity(0.55), height: 1.45)),
+      return GestureDetector(
+        onTap: widget.onExpandToggle,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(12),
+          child: Text(_plain!,
+              style: TextStyle(
+                  color: cs.onSurface.withOpacity(0.55), height: 1.45)),
+        ),
       );
     }
     final pos = PlayerController.instance.position.inMilliseconds / 1000.0;
     final active = _activeIndex(pos);
-    return ListView.builder(
-      controller: _scroll,
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-      itemCount: _lines.length,
-      itemBuilder: (_, i) {
-        final on = i == active;
-        final past = i < active;
-        return AnimatedDefaultTextStyle(
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOutCubic,
-          style: TextStyle(
-            fontSize: on ? 18 : 15,
-            fontWeight: on ? FontWeight.w800 : FontWeight.w500,
-            height: 1.35,
-            color: on
-                ? cs.primary
-                : past
-                    ? cs.onSurface.withOpacity(0.35)
-                    : cs.onSurface.withOpacity(0.55),
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (widget.onExpandToggle != null)
+          Align(
+            alignment: Alignment.centerRight,
+            child: IconButton(
+              icon: Icon(widget.expanded
+                  ? Icons.fullscreen_exit
+                  : Icons.fullscreen),
+              onPressed: widget.onExpandToggle,
+            ),
           ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-            child: Text(_lines[i].line),
+        Expanded(
+          child: ListView.builder(
+            controller: _scroll,
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+            itemCount: _lines.length,
+            itemBuilder: (_, i) {
+              final on = i == active;
+              final past = i < active;
+              return AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 240),
+                curve: Curves.easeOutCubic,
+                style: TextStyle(
+                  fontSize: on
+                      ? (widget.expanded ? 26 : 18)
+                      : (widget.expanded ? 18 : 15),
+                  fontWeight: on ? FontWeight.w800 : FontWeight.w500,
+                  height: 1.35,
+                  color: on
+                      ? cs.primary
+                      : past
+                          ? cs.onSurface.withOpacity(0.32)
+                          : cs.onSurface.withOpacity(0.55),
+                ),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(_lines[i].line),
+                      if (_translation != null && on)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(_translation!,
+                              style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w400,
+                                  color: cs.onSurface.withOpacity(0.45))),
+                        ),
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
-        );
-      },
+        ),
+      ],
     );
   }
 }
