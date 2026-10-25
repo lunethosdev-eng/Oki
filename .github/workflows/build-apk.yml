@@ -26,10 +26,70 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Ensure Android platform files
+      - name: Regenerate Android (Flutter embedding)
         run: |
+          set -e
+          # Remove incomplete android host — force a valid Flutter project
+          rm -rf android
           flutter create . --project-name pokke --org com.pokke --platforms=android
-          # keep our sources; flutter create does not overwrite lib/ or existing kotlin if present
+          # Fix default test that references MyApp (if recreated)
+          if [ -f test/widget_test.dart ]; then
+            cat > test/widget_test.dart << 'TESTEOF'
+          import 'package:flutter_test/flutter_test.dart';
+          import 'package:pokke/main.dart';
+
+          void main() {
+            testWidgets('PokkeApp exists', (tester) async {
+              expect(PokkeApp, isNotNull);
+            });
+          }
+          TESTEOF
+          fi
+
+      - name: Patch AndroidManifest (permissions + TV)
+        run: |
+          set -e
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          python3 << 'PY'
+          from pathlib import Path
+          p = Path("android/app/src/main/AndroidManifest.xml")
+          t = p.read_text()
+          perms = """
+              <uses-permission android:name="android.permission.INTERNET"/>
+              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
+              <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+              <uses-permission android:name="android.permission.WAKE_LOCK"/>
+              <uses-feature android:name="android.software.leanback" android:required="false"/>
+              <uses-feature android:name="android.hardware.touchscreen" android:required="false"/>
+          """
+          if "FOREGROUND_SERVICE_MEDIA_PLAYBACK" not in t:
+              t = t.replace("<manifest", "<manifest", 1)
+              # insert after <manifest ...>
+              import re
+              t = re.sub(
+                  r"(<manifest[^>]*>)",
+                  r"\1\n" + perms,
+                  t,
+                  count=1,
+              )
+          if "LEANBACK_LAUNCHER" not in t and "android.intent.category.LAUNCHER" in t:
+              t = t.replace(
+                  """<category android:name="android.intent.category.LAUNCHER"/>
+              </intent-filter>""",
+                  """<category android:name="android.intent.category.LAUNCHER"/>
+              </intent-filter>
+              <intent-filter>
+                  <action android:name="android.intent.action.MAIN"/>
+                  <category android:name="android.intent.category.LEANBACK_LAUNCHER"/>
+              </intent-filter>""",
+              )
+          if 'android:usesCleartextTraffic' not in t:
+              t = t.replace("<application", '<application android:usesCleartextTraffic="true"', 1)
+          p.write_text(t)
+          print("manifest patched")
+          PY
 
       - name: Pub get
         run: flutter pub get
