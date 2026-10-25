@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pokke/services/settings_service.dart';
+import 'package:pokke/services/music_api_service.dart';
 import 'package:pokke/services/supabase_service.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:pokke/screens/listen_together_screen.dart';
@@ -201,7 +202,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: 8),
                 FilledButton(
                   onPressed: () async {
-                    await s.setMusicApiBase(_serverCtrl.text);
+                    await MusicApiService.setGlobalBase(_serverCtrl.text);
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('Servidor guardado')),
