@@ -1,11 +1,6 @@
 package com.pokke.app
 
-import android.bluetooth.BluetoothAdapter
-import android.bluetooth.BluetoothManager
-import android.bluetooth.BluetoothProfile
 import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.os.BatteryManager
@@ -40,7 +35,6 @@ class MainActivity : FlutterActivity() {
 
     private fun listDevices(): List<Map<String, Any?>> {
         val out = mutableListOf<Map<String, Any?>>()
-        // This phone
         out.add(
             mapOf(
                 "id" to "phone",
@@ -50,7 +44,6 @@ class MainActivity : FlutterActivity() {
                 "active" to true
             )
         )
-
         try {
             val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -61,17 +54,29 @@ class MainActivity : FlutterActivity() {
                         AudioDeviceInfo.TYPE_BLUETOOTH_SCO -> "bluetooth"
                         AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
                         AudioDeviceInfo.TYPE_WIRED_HEADSET,
-                        AudioDeviceInfo.TYPE_USB_HEADSET -> "wired"
+                        AudioDeviceInfo.TYPE_USB_HEADSET,
+                        AudioDeviceInfo.TYPE_USB_DEVICE -> "wired"
+                        // AUX / line-out / dock often report as:
+                        AudioDeviceInfo.TYPE_AUX_LINE,
+                        AudioDeviceInfo.TYPE_HDMI,
+                        AudioDeviceInfo.TYPE_HDMI_ARC,
+                        AudioDeviceInfo.TYPE_DOCK -> "aux"
                         AudioDeviceInfo.TYPE_BUILTIN_SPEAKER -> continue
                         else -> continue
                     }
                     val name = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                         d.productName?.toString()?.ifBlank { null }
                     } else null
+                    val label = name ?: when (type) {
+                        "bluetooth" -> "Bluetooth"
+                        "wired" -> "Auriculares"
+                        "aux" -> "AUX / Line-out"
+                        else -> "Salida"
+                    }
                     out.add(
                         mapOf(
                             "id" to "dev_${d.id}",
-                            "name" to (name ?: if (type == "bluetooth") "Bluetooth" else "Auriculares"),
+                            "name" to label,
                             "type" to type,
                             "battery" to null,
                             "active" to false
@@ -80,11 +85,6 @@ class MainActivity : FlutterActivity() {
                 }
             }
         } catch (_: Exception) {
-        }
-
-        // Mark last non-phone as active if present (heuristic)
-        if (out.size > 1) {
-            // keep phone active by default; UI can switch later
         }
         return out
     }
