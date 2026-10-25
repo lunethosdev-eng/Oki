@@ -3,7 +3,7 @@ import 'package:pokke/services/supabase_service.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:pokke/screens/profile_customize_screen.dart';
 import 'package:pokke/screens/friends_map_screen.dart';
-import 'package:pokke/screens/private_chat_screen.dart';
+import 'package:pokke/screens/chat_list_screen.dart';
 import 'package:pokke/services/settings_service.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -115,7 +115,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const PrivateChatScreen()),
+                MaterialPageRoute(builder: (_) => const ChatListScreen()),
               ),
             ),
           if (SupabaseService.isLoggedIn && !SupabaseService.isGuest)
