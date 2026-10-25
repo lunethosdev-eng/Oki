@@ -5,7 +5,9 @@ import 'package:pokke/services/supabase_service.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:pokke/screens/listen_together_screen.dart';
 import 'package:pokke/screens/friends_map_screen.dart';
-import 'package:pokke/screens/private_chat_screen.dart';
+import 'package:pokke/screens/chat_list_screen.dart';
+import 'package:pokke/screens/device_link_screen.dart';
+import 'package:pokke/adaptive/breakpoints.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -173,6 +175,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               
               
+              
+              _h('Dispositivos'),
+              ListTile(
+                leading: const Icon(Icons.cast_connected_outlined),
+                title: const Text('Vincular dispositivo'),
+                subtitle: const Text('QR / código para TV o otra pantalla'),
+                onTap: () {
+                  final isTv = Breakpoints.of(context) == PokkeFormFactor.tv;
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => DeviceLinkScreen(asTvHost: isTv),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 8),
               if (s.flag('friends_map'))
                 ListTile(
                   leading: const Icon(Icons.map_outlined),
@@ -190,7 +209,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const PrivateChatScreen()),
+                    MaterialPageRoute(builder: (_) => const ChatListScreen()),
                   ),
                 ),
 
