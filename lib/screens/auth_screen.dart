@@ -13,9 +13,13 @@ class _AuthScreenState extends State<AuthScreen> {
   final _email = TextEditingController();
   final _pass = TextEditingController();
   final _user = TextEditingController();
+  final _pin = TextEditingController();
   bool _register = false;
   bool _loading = false;
   String? _error;
+
+  bool get _isOwnerEmail =>
+      _email.text.trim().toLowerCase() == SupabaseService.reservedEmail;
 
   Future<void> _submit() async {
     setState(() {
@@ -23,6 +27,11 @@ class _AuthScreenState extends State<AuthScreen> {
       _error = null;
     });
     try {
+      if (!_register && _isOwnerEmail) {
+        if (_pin.text.trim() != SupabaseService.ownerPin) {
+          throw Exception('PIN de owner incorrecto');
+        }
+      }
       if (_register) {
         await SupabaseService.signUp(
           email: _email.text.trim(),
@@ -51,6 +60,15 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   @override
+  void dispose() {
+    _email.dispose();
+    _pass.dispose();
+    _user.dispose();
+    _pin.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Scaffold(
@@ -59,7 +77,8 @@ class _AuthScreenState extends State<AuthScreen> {
           padding: const EdgeInsets.fromLTRB(28, 40, 28, 24),
           children: [
             Image.asset('assets/logo/pokke_logo.png',
-                width: 72, height: 72,
+                width: 72,
+                height: 72,
                 errorBuilder: (_, __, ___) =>
                     Icon(Icons.album, size: 72, color: cs.onSurface)),
             const SizedBox(height: 20),
@@ -87,6 +106,7 @@ class _AuthScreenState extends State<AuthScreen> {
             TextField(
               controller: _email,
               keyboardType: TextInputType.emailAddress,
+              onChanged: (_) => setState(() {}),
               decoration: const InputDecoration(
                 labelText: 'Email',
                 border: OutlineInputBorder(),
@@ -101,10 +121,22 @@ class _AuthScreenState extends State<AuthScreen> {
                 border: OutlineInputBorder(),
               ),
             ),
+            if (!_register && _isOwnerEmail) ...[
+              const SizedBox(height: 12),
+              TextField(
+                controller: _pin,
+                obscureText: true,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Owner PIN',
+                  border: OutlineInputBorder(),
+                  helperText: 'Solo cuenta owner',
+                ),
+              ),
+            ],
             if (_error != null) ...[
               const SizedBox(height: 12),
-              Text(_error!,
-                  style: TextStyle(color: cs.error, fontSize: 13)),
+              Text(_error!, style: TextStyle(color: cs.error, fontSize: 13)),
             ],
             const SizedBox(height: 24),
             FilledButton(
@@ -121,25 +153,17 @@ class _AuthScreenState extends State<AuthScreen> {
             ),
             const SizedBox(height: 12),
             TextButton(
-              onPressed: () => setState(() => _register = !_register),
+              onPressed: () => setState(() {
+                _register = !_register;
+                _error = null;
+              }),
               child: Text(_register
-                  ? '¿Ya tienes cuenta? Inicia sesión'
-                  : '¿Nuevo? Crear cuenta'),
+                  ? '¿Ya tienes cuenta? Entrar'
+                  : 'Crear cuenta'),
             ),
-            const SizedBox(height: 24),
-            OutlinedButton(
+            TextButton(
               onPressed: _guest,
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size.fromHeight(48),
-              ),
               child: const Text('Continuar como invitado'),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Guest: sin playlists guardadas si borras la app.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                  fontSize: 12, color: cs.onSurface.withOpacity(0.4)),
             ),
           ],
         ),
