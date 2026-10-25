@@ -65,6 +65,8 @@ class DevicesService extends ChangeNotifier {
         return Icons.bluetooth_connected_rounded;
       case 'wired':
         return Icons.headphones_rounded;
+      case 'aux':
+        return Icons.settings_input_component_rounded;
       case 'cast':
         return Icons.cast_rounded;
       default:
