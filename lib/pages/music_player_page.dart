@@ -20,6 +20,7 @@ class MusicPlayerPage extends StatefulWidget {
 class _MusicPlayerPageState extends State<MusicPlayerPage> {
   bool _lyricsExpanded = false;
   bool _showLyrics = false; // TV: only after tapping Lyrics
+  bool _useAnimatedCover = false;
   bool _following = false;
   bool _dockMode = false;
 
@@ -56,8 +57,15 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
     DevicesService.instance.refresh();
   }
 
+  String? _animOf(Map<String, dynamic>? song) {
+    final a = song?['animated_cover_url']?.toString();
+    if (a != null && a.startsWith('http')) return a;
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
+
     final pc = PlayerController.instance;
     final cs = Theme.of(context).colorScheme;
     final isTv = widget.tvMode;
@@ -100,8 +108,10 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
             children: [
               Positioned.fill(
                 child: PlayerBackground(
-                  coverUrl: cover,
-                  animatedCoverUrl: song?['animated_cover_url']?.toString(),
+                  coverUrl: _useAnimatedCover
+                      ? (_animOf(song) ?? cover)
+                      : cover,
+                  animatedCoverUrl: _useAnimatedCover ? _animOf(song) : null,
                   mode: bgMode,
                 ),
               ),
@@ -135,6 +145,20 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                               ],
                             ),
                           ),
+                          if (_animOf(song) != null)
+                            IconButton(
+                              tooltip: _useAnimatedCover
+                                  ? 'Cover estático'
+                                  : 'Cover animado',
+                              onPressed: () => setState(
+                                  () => _useAnimatedCover = !_useAnimatedCover),
+                              icon: Icon(
+                                Icons.gif_box_outlined,
+                                color: _useAnimatedCover
+                                    ? cs.primary
+                                    : cs.onSurface,
+                              ),
+                            ),
                           IconButton(
                             tooltip: 'Más',
                             onPressed: () {
@@ -353,7 +377,11 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
         children: [
           Positioned.fill(
             child: PlayerBackground(
-              coverUrl: cover,
+              coverUrl: _useAnimatedCover
+                  ? (_animOf(pc.current) ?? cover)
+                  : cover,
+              animatedCoverUrl:
+                  _useAnimatedCover ? _animOf(pc.current) : null,
               mode: bgMode,
               tv: true,
             ),
@@ -383,6 +411,18 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                         icon: const Icon(Icons.account_circle_outlined,
                             color: Colors.white70, size: 28),
                       ),
+                      if (_animOf(pc.current) != null)
+                        IconButton(
+                          tooltip: 'Cover animado',
+                          onPressed: () => setState(
+                              () => _useAnimatedCover = !_useAnimatedCover),
+                          icon: Icon(
+                            Icons.gif_box_outlined,
+                            color: _useAnimatedCover
+                                ? Colors.lightBlueAccent
+                                : Colors.white70,
+                          ),
+                        ),
                       IconButton(
                         tooltip: 'Más',
                         onPressed: () {
