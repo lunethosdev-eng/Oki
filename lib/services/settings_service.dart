@@ -33,8 +33,10 @@ class SettingsService extends ChangeNotifier {
   };
 
   String? musicApiBaseOverride;
-  /// 'color' | 'blur'
+  /// color | blur | cinematic | dark | gradient | mesh
   String playerBgMode = 'color';
+  /// normal | color | emotion
+  String lyricsMode = 'color';
   /// header | nav | settings_only
   String mapEntry = 'nav';
 
@@ -56,6 +58,7 @@ class SettingsService extends ChangeNotifier {
     notificationSound = _p.getString('notif_sound_id') ?? 'chime';
     musicApiBaseOverride = _p.getString('music_api_base');
     playerBgMode = _p.getString('player_bg_mode') ?? 'color';
+    lyricsMode = _p.getString('lyrics_mode') ?? 'color';
     mapEntry = _p.getString('map_entry') ?? 'nav';
     for (final k in beta.keys.toList()) {
       beta[k] = _p.getBool('beta_$k') ?? false;
@@ -139,6 +142,11 @@ class SettingsService extends ChangeNotifier {
   Future<void> setPlayerBgMode(String mode) async {
     playerBgMode = mode;
     await _set('player_bg_mode', mode);
+  }
+
+  Future<void> setLyricsMode(String mode) async {
+    lyricsMode = mode;
+    await _set('lyrics_mode', mode);
   }
 
   Future<void> setMapEntry(String v) async {
