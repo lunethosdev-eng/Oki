@@ -234,29 +234,24 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
                             height: 56,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              gradient: LinearGradient(
-                                colors: _listening
-                                    ? [Colors.redAccent, Colors.orange]
-                                    : [
-                                        const Color(0xFF4285F4),
-                                        const Color(0xFF34A853),
-                                        const Color(0xFFFBBC05),
-                                        const Color(0xFFEA4335),
-                                      ],
-                              ),
+                              color: _listening
+                                  ? Colors.redAccent
+                                  : Colors.white,
                               boxShadow: [
                                 BoxShadow(
                                   color: (_listening
                                           ? Colors.redAccent
-                                          : const Color(0xFF4285F4))
-                                      .withOpacity(0.45),
-                                  blurRadius: 16,
+                                          : Colors.white)
+                                      .withOpacity(0.35),
+                                  blurRadius: 18,
                                 ),
                               ],
                             ),
                             child: Icon(
                               _listening ? Icons.mic : Icons.mic_none,
-                              color: Colors.white,
+                              color: _listening
+                                  ? Colors.white
+                                  : Colors.black87,
                             ),
                           ),
                         ),
