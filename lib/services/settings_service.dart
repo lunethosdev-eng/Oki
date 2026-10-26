@@ -39,6 +39,9 @@ class SettingsService extends ChangeNotifier {
   String lyricsMode = 'color';
   /// header | nav | settings_only
   String mapEntry = 'nav';
+  /// Custom hero for TV home: local path or http mp4/gif/image
+  String? heroMediaPath;
+  String heroMediaType = 'auto'; // auto | image | gif | video
 
   Future<void> load() async {
     _p = await SharedPreferences.getInstance();
@@ -60,6 +63,8 @@ class SettingsService extends ChangeNotifier {
     playerBgMode = _p.getString('player_bg_mode') ?? 'color';
     lyricsMode = _p.getString('lyrics_mode') ?? 'color';
     mapEntry = _p.getString('map_entry') ?? 'nav';
+    heroMediaPath = _p.getString('hero_media_path');
+    heroMediaType = _p.getString('hero_media_type') ?? 'auto';
     for (final k in beta.keys.toList()) {
       beta[k] = _p.getBool('beta_$k') ?? false;
     }
@@ -153,4 +158,12 @@ class SettingsService extends ChangeNotifier {
     mapEntry = v;
     await _set('map_entry', v);
   }
+
+  Future<void> setHeroMedia(String? path, {String type = 'auto'}) async {
+    heroMediaPath = path;
+    heroMediaType = type;
+    await _set('hero_media_path', path);
+    await _set('hero_media_type', type);
+  }
 }
+
