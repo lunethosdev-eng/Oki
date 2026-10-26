@@ -1,3 +1,4 @@
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:pokke/services/settings_service.dart';
 import 'package:pokke/services/music_api_service.dart';
@@ -7,6 +8,7 @@ import 'package:pokke/screens/listen_together_screen.dart';
 import 'package:pokke/screens/friends_map_screen.dart';
 import 'package:pokke/screens/chat_list_screen.dart';
 import 'package:pokke/screens/device_link_screen.dart';
+import 'package:pokke/screens/remote_control_screen.dart';
 import 'package:pokke/screens/owner_panel_screen.dart';
 import 'package:pokke/services/offline_service.dart';
 import 'package:pokke/adaptive/breakpoints.dart';
@@ -151,6 +153,53 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(height: 20),
               _h('Beta · funciones reales'),
               
+              
+              _h('Héroe Home (TV)'),
+              ListTile(
+                title: const Text('Media del héroe'),
+                subtitle: Text(
+                  s.heroMediaPath == null || s.heroMediaPath!.isEmpty
+                      ? 'Cover de la primera canción por defecto'
+                      : s.heroMediaPath!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Wrap(
+                  spacing: 8,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        final x = await ImagePicker().pickImage(
+                            source: ImageSource.gallery);
+                        if (x != null) {
+                          await s.setHeroMedia(x.path, type: 'image');
+                        }
+                      },
+                      icon: const Icon(Icons.image_outlined),
+                      label: const Text('Imagen/GIF'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        final x = await ImagePicker().pickVideo(
+                            source: ImageSource.gallery);
+                        if (x != null) {
+                          await s.setHeroMedia(x.path, type: 'video');
+                        }
+                      },
+                      icon: const Icon(Icons.videocam_outlined),
+                      label: const Text('MP4'),
+                    ),
+                    TextButton(
+                      onPressed: () => s.setHeroMedia(null),
+                      child: const Text('Quitar'),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
               _h('Player'),
               ListTile(
                 title: const Text('Fondo del player'),
@@ -226,9 +275,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(height: 16),
               _h('Dispositivos'),
               ListTile(
-                leading: const Icon(Icons.cast_connected_outlined),
-                
-              ListTile(
                 leading: const Icon(Icons.cloud_download_outlined),
                 title: const Text('Descargar catálogo offline'),
                 subtitle: AnimatedBuilder(
@@ -236,7 +282,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   builder: (_, __) {
                     final o = OfflineService.instance;
                     if (o.downloadingCatalog) {
-                      return Text('${o.catalogDone}/${o.catalogTotal} · ETA ${o.etaLabel()}');
+                      return Text(
+                          '${o.catalogDone}/${o.catalogTotal} · ETA ${o.etaLabel()}');
                     }
                     return const Text('Segundo plano · Music/Pokke');
                   },
@@ -249,23 +296,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       content: const Text(
                           'Descarga el catálogo dentro de la app (Music/Pokke). Puede tardar según la red.'),
                       actions: [
-                        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-                        FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Descargar')),
+                        TextButton(
+                            onPressed: () => Navigator.pop(ctx, false),
+                            child: const Text('Cancelar')),
+                        FilledButton(
+                            onPressed: () => Navigator.pop(ctx, true),
+                            child: const Text('Descargar')),
                       ],
                     ),
                   );
                   if (go == true) OfflineService.instance.downloadCatalog();
                 },
               ),
+              ListTile(
+                leading: const Icon(Icons.cast_connected_outlined),
                 title: const Text('Vincular dispositivo'),
                 subtitle: const Text('QR / código para TV o otra pantalla'),
                 onTap: () {
-                  final isTv = Breakpoints.of(context) == PokkeFormFactor.tv;
+                  final isTv =
+                      Breakpoints.of(context) == PokkeFormFactor.tv;
                   Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (_) => DeviceLinkScreen(asTvHost: isTv),
                     ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.settings_remote_outlined),
+                title: const Text('Control remoto'),
+                subtitle: const Text('Mando virtual si hay TV vinculada'),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const RemoteControlScreen()),
                   );
                 },
               ),
