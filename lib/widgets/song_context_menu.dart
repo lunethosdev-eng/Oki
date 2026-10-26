@@ -104,13 +104,14 @@ Future<void> showSongContextMenu(
   if (isTv) {
     return showDialog(
       context: context,
-      builder: (_) => Align(
-        alignment: Alignment.centerRight,
+      barrierColor: Colors.black54,
+      builder: (ctx) => Center(
         child: Material(
-          color: const Color(0xFF161616),
+          color: const Color(0xFF1C1C1F),
+          elevation: 12,
           borderRadius: BorderRadius.circular(16),
-          child: SizedBox(
-            width: 360,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420, minWidth: 320),
             child: body,
           ),
         ),
