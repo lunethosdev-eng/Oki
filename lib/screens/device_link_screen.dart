@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:pokke/adaptive/breakpoints.dart';
 import 'package:pokke/services/device_link_service.dart';
+import 'package:pokke/services/devices_service.dart';
 import 'package:pokke/services/supabase_service.dart';
 import 'package:pokke/adaptive/adaptive_shell.dart';
 
@@ -25,6 +26,7 @@ class _DeviceLinkScreenState extends State<DeviceLinkScreen> {
   void initState() {
     super.initState();
     DeviceLinkService.instance.addListener(_onLink);
+    DevicesService.instance.refresh();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final isTv = widget.asTvHost ||
@@ -39,7 +41,7 @@ class _DeviceLinkScreenState extends State<DeviceLinkScreen> {
   void _onLink() {
     if (DeviceLinkService.instance.linked && mounted) {
       setState(() => _msg = '¡Cuenta vinculada!');
-      Future.delayed(const Duration(milliseconds: 800), () {
+      Future.delayed(const Duration(milliseconds: 700), () {
         if (!mounted) return;
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const AdaptiveShell()),
@@ -60,6 +62,7 @@ class _DeviceLinkScreenState extends State<DeviceLinkScreen> {
     setState(() {
       _busy = true;
       _hostMode = true;
+      _msg = null;
     });
     final c = await DeviceLinkService.instance.startHostPairing();
     if (mounted) {
@@ -80,24 +83,24 @@ class _DeviceLinkScreenState extends State<DeviceLinkScreen> {
       _busy = false;
       _msg = ok
           ? 'Código enviado. El otro dispositivo debería entrar solo.'
-          : 'Código inválido, expirado o ya usado. ¿Sesión iniciada aquí?';
+          : 'Código inválido/expirado o sin sesión aquí.';
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final payload = DeviceLinkService.instance.pendingPayload ?? _shown ?? '';
+    final payload =
+        DeviceLinkService.instance.pendingPayload ?? _shown ?? '';
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_hostMode ? 'Vincular este dispositivo' : 'Vincular otro dispositivo'),
+        title: Text(_hostMode
+            ? 'Mostrar código'
+            : 'Vincular otro dispositivo'),
         actions: [
           if (!_hostMode)
-            TextButton(
-              onPressed: _startHost,
-              child: const Text('Mostrar código'),
-            ),
+            TextButton(onPressed: _startHost, child: const Text('Mostrar código')),
         ],
       ),
       body: ListView(
@@ -105,32 +108,68 @@ class _DeviceLinkScreenState extends State<DeviceLinkScreen> {
         children: [
           Text(
             _hostMode
-                ? 'En el teléfono donde ya iniciaste sesión: Settings → Vincular dispositivo e introduce el código, o escanea el QR.'
-                : 'En el otro dispositivo (TV / tablet) abre Vincular y genera un código. Escríbelo aquí.',
+                ? 'En el teléfono con sesión: Settings → Vincular → escribe este código.'
+                : 'En TV/tablet: abre Vincular → Mostrar código. Escríbelo aquí (debes tener sesión).',
             style: TextStyle(color: cs.onSurface.withOpacity(0.6), height: 1.4),
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 20),
+          // Connected devices
+          AnimatedBuilder(
+            animation: DevicesService.instance,
+            builder: (_, __) {
+              final devs = DevicesService.instance.devices;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Dispositivos de audio',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w700, color: cs.onSurface)),
+                  const SizedBox(height: 6),
+                  if (devs.isEmpty)
+                    Text('Ninguno detectado',
+                        style: TextStyle(
+                            color: cs.onSurface.withOpacity(0.45)))
+                  else
+                    ...devs.map((d) => ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: Icon(DevicesService.instance.iconFor(d.type)),
+                          title: Text(d.name),
+                          subtitle: Text(
+                              '${d.type}${d.battery != null ? ' · ${d.battery}%' : ''}'),
+                          trailing: d.active
+                              ? Icon(Icons.check_circle, color: cs.primary)
+                              : null,
+                        )),
+                  TextButton.icon(
+                    onPressed: () => DevicesService.instance.refresh(),
+                    icon: const Icon(Icons.refresh, size: 18),
+                    label: const Text('Actualizar'),
+                  ),
+                ],
+              );
+            },
+          ),
+          const Divider(height: 28),
           if (_hostMode) ...[
             if (_busy && _shown == null)
               const Center(child: CircularProgressIndicator())
             else if (_shown != null) ...[
               Center(
-                child: Text(
-                  _shown!,
-                  style: TextStyle(
-                    fontSize: 44,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 10,
-                    color: cs.primary,
-                  ),
-                ),
+                child: Text(_shown!,
+                    style: TextStyle(
+                      fontSize: 44,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 10,
+                      color: cs.primary,
+                    )),
               ),
               const SizedBox(height: 8),
               Center(
-                child: Text('Válido 5 minutos · se actualiza solo al vincular',
-                    style: TextStyle(color: cs.onSurface.withOpacity(0.45))),
+                child: Text('Válido 5 minutos',
+                    style:
+                        TextStyle(color: cs.onSurface.withOpacity(0.45))),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
               Center(
                 child: Container(
                   padding: const EdgeInsets.all(16),
@@ -147,20 +186,16 @@ class _DeviceLinkScreenState extends State<DeviceLinkScreen> {
                 ),
               ),
             ],
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
             OutlinedButton(
               onPressed: _startHost,
               child: const Text('Generar nuevo código'),
             ),
           ] else ...[
             if (!SupabaseService.isLoggedIn || SupabaseService.isGuest)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: Text(
-                  'Debes iniciar sesión aquí para enviar la cuenta al otro dispositivo.',
-                  style: TextStyle(color: cs.error),
-                ),
-              ),
+              Text('Inicia sesión en este teléfono para enviar la cuenta.',
+                  style: TextStyle(color: cs.error)),
+            const SizedBox(height: 8),
             TextField(
               controller: _code,
               textCapitalization: TextCapitalization.characters,
@@ -173,7 +208,7 @@ class _DeviceLinkScreenState extends State<DeviceLinkScreen> {
                 border: OutlineInputBorder(),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             FilledButton(
               onPressed: _busy ? null : _claim,
               child: _busy
