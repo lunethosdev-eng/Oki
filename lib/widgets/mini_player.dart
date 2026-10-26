@@ -4,6 +4,7 @@ import 'package:pokke/services/player_controller.dart';
 import 'package:pokke/pages/music_player_page.dart';
 import 'package:pokke/widgets/liquid_glass.dart';
 import 'package:pokke/widgets/player_route.dart';
+import 'package:pokke/adaptive/breakpoints.dart';
 
 class MiniPlayer extends StatefulWidget {
   const MiniPlayer({super.key});
@@ -37,7 +38,11 @@ class _MiniPlayerState extends State<MiniPlayer>
   void _openFull() {
     HapticFeedback.lightImpact();
     Navigator.of(context).push(
-      PlayerSlideRoute(page: const MusicPlayerPage()),
+      PlayerSlideRoute(
+        page: MusicPlayerPage(
+          tvMode: Breakpoints.of(context) == PokkeFormFactor.tv,
+        ),
+      ),
     );
   }
 
