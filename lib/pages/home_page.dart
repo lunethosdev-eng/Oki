@@ -57,17 +57,6 @@ class _HomePageState extends State<HomePage> {
 
   void _openPlayer() {
     final isTv = Breakpoints.of(context) == PokkeFormFactor.tv;
-    if (isTv) {
-      return Scaffold(
-        backgroundColor: const Color(0xFF0B0B0F),
-        body: TvHome(
-          songs: _songs,
-          loading: _loading,
-          onRefresh: _load,
-        ),
-      );
-    }
-
     Navigator.of(context).push(
       PlayerSlideRoute(page: MusicPlayerPage(tvMode: isTv)),
     );
