@@ -8,6 +8,7 @@ import 'package:pokke/screens/friends_map_screen.dart';
 import 'package:pokke/screens/chat_list_screen.dart';
 import 'package:pokke/screens/device_link_screen.dart';
 import 'package:pokke/screens/owner_panel_screen.dart';
+import 'package:pokke/services/offline_service.dart';
 import 'package:pokke/adaptive/breakpoints.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -226,6 +227,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _h('Dispositivos'),
               ListTile(
                 leading: const Icon(Icons.cast_connected_outlined),
+                
+              ListTile(
+                leading: const Icon(Icons.cloud_download_outlined),
+                title: const Text('Descargar catálogo offline'),
+                subtitle: AnimatedBuilder(
+                  animation: OfflineService.instance,
+                  builder: (_, __) {
+                    final o = OfflineService.instance;
+                    if (o.downloadingCatalog) {
+                      return Text('${o.catalogDone}/${o.catalogTotal} · ETA ${o.etaLabel()}');
+                    }
+                    return const Text('Segundo plano · Music/Pokke');
+                  },
+                ),
+                onTap: () async {
+                  final go = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('Descarga offline'),
+                      content: const Text(
+                          'Descarga el catálogo dentro de la app (Music/Pokke). Puede tardar según la red.'),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+                        FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Descargar')),
+                      ],
+                    ),
+                  );
+                  if (go == true) OfflineService.instance.downloadCatalog();
+                },
+              ),
                 title: const Text('Vincular dispositivo'),
                 subtitle: const Text('QR / código para TV o otra pantalla'),
                 onTap: () {
