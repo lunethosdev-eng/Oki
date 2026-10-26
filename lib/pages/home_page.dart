@@ -9,6 +9,7 @@ import 'package:pokke/adaptive/breakpoints.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
 import 'package:pokke/widgets/song_context_menu.dart';
+import 'package:pokke/widgets/tv_home.dart';
 import 'package:pokke/widgets/player_route.dart';
 
 class HomePage extends StatefulWidget {
@@ -56,6 +57,17 @@ class _HomePageState extends State<HomePage> {
 
   void _openPlayer() {
     final isTv = Breakpoints.of(context) == PokkeFormFactor.tv;
+    if (isTv) {
+      return Scaffold(
+        backgroundColor: const Color(0xFF0B0B0F),
+        body: TvHome(
+          songs: _songs,
+          loading: _loading,
+          onRefresh: _load,
+        ),
+      );
+    }
+
     Navigator.of(context).push(
       PlayerSlideRoute(page: MusicPlayerPage(tvMode: isTv)),
     );
@@ -72,6 +84,17 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isTv = Breakpoints.of(context) == PokkeFormFactor.tv;
+    if (isTv) {
+      return Scaffold(
+        backgroundColor: const Color(0xFF0B0B0F),
+        body: TvHome(
+          songs: _songs,
+          loading: _loading,
+          onRefresh: _load,
+        ),
+      );
+    }
+
     final compact = _scroll > 40;
 
     return NotificationListener<ScrollNotification>(
@@ -134,27 +157,11 @@ class _HomePageState extends State<HomePage> {
                                 );
                                 _loadAvatar();
                               },
-                              icon: CircleAvatar(
-                                radius: 14,
-                                backgroundColor: cs.surfaceContainerHighest,
-                                backgroundImage: () {
-                                  if (_avatarUrl != null &&
-                                      _avatarUrl!.startsWith('http')) {
-                                    return NetworkImage(_avatarUrl!);
-                                  }
-                                  if (_avatarPath != null &&
-                                      File(_avatarPath!).existsSync()) {
-                                    return FileImage(File(_avatarPath!));
-                                  }
-                                  return null;
-                                }(),
-                                child: (_avatarUrl == null &&
-                                        (_avatarPath == null ||
-                                            !File(_avatarPath ?? '')
-                                                .existsSync()))
-                                    ? Icon(Icons.person_outline,
-                                        size: 16, color: cs.onSurface)
-                                    : null,
+                              icon: _HeaderAvatar(
+                                url: _avatarUrl,
+                                path: _avatarPath,
+                                color: cs.onSurface,
+                                bg: cs.surfaceContainerHighest,
                               ),
                             ),
                           ],
@@ -253,6 +260,31 @@ class _HomePageState extends State<HomePage> {
             ),
         ],
       ),
+    );
+  }
+}
+
+
+class _HeaderAvatar extends StatelessWidget {
+  final String? url;
+  final String? path;
+  final Color color;
+  final Color bg;
+  const _HeaderAvatar({this.url, this.path, required this.color, required this.bg});
+
+  @override
+  Widget build(BuildContext context) {
+    ImageProvider? img;
+    if (url != null && url!.startsWith('http')) {
+      img = NetworkImage(url!);
+    } else if (path != null && File(path!).existsSync()) {
+      img = FileImage(File(path!));
+    }
+    return CircleAvatar(
+      radius: 14,
+      backgroundColor: bg,
+      backgroundImage: img,
+      child: img == null ? Icon(Icons.person_outline, size: 16, color: color) : null,
     );
   }
 }
