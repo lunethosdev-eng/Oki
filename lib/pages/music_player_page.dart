@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:pokke/services/player_controller.dart';
 import 'package:pokke/services/devices_service.dart';
 import 'package:pokke/services/settings_service.dart';
+import 'package:pokke/widgets/tv_side_panel.dart';
 import 'package:pokke/screens/artist_screen.dart';
 import 'package:pokke/widgets/karaoke_lyrics.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -395,12 +396,17 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                       ),
                       const Spacer(),
                       IconButton(
-                        onPressed: () {},
+                        tooltip: 'Settings',
+                        onPressed: () => openTvSettings(context),
                         icon: const Icon(Icons.settings_outlined,
                             color: Colors.white70),
                       ),
-                      const Icon(Icons.account_circle_outlined,
-                          color: Colors.white70, size: 28),
+                      IconButton(
+                        tooltip: 'Profile',
+                        onPressed: () => openTvProfile(context),
+                        icon: const Icon(Icons.account_circle_outlined,
+                            color: Colors.white70, size: 28),
+                      ),
                     ],
                   ),
                   const Spacer(),
