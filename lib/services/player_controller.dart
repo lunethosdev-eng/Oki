@@ -22,6 +22,7 @@ class PlayerController extends ChangeNotifier {
   int queueIndex = 0;
   bool isPlaying = false;
   bool get playing => isPlaying;
+  double volume = 1.0;
   Duration position = Duration.zero;
   Duration duration = Duration.zero;
   /// 0 off, 1 all, 2 one
@@ -113,6 +114,29 @@ class PlayerController extends ChangeNotifier {
       queueIndex--;
       await playSong(queue[queueIndex]);
     }
+  }
+
+  Future<void> setVolume(double v) async {
+    volume = v.clamp(0.0, 1.0);
+    try {
+      await _player.setVolume(volume);
+    } catch (_) {}
+    notifyListeners();
+  }
+
+  Future<void> pause() async {
+    try {
+      await _player.pause();
+      isPlaying = false;
+    } catch (_) {}
+    notifyListeners();
+  }
+
+  Future<void> resume() async {
+    try {
+      await _player.play();
+    } catch (_) {}
+    notifyListeners();
   }
 
   void cycleRepeat() {
