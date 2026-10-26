@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:pokke/services/supabase_service.dart';
 import 'package:share_plus/share_plus.dart';
@@ -5,6 +6,7 @@ import 'package:pokke/screens/profile_customize_screen.dart';
 import 'package:pokke/screens/friends_map_screen.dart';
 import 'package:pokke/screens/chat_list_screen.dart';
 import 'package:pokke/services/settings_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -14,13 +16,34 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   Map<String, dynamic>? _profile;
+  String? _localAvatar;
 
   @override
   void initState() {
     super.initState();
-    SupabaseService.getProfile().then((p) {
-      if (mounted) setState(() => _profile = p);
-    });
+    _load();
+  }
+
+  Future<void> _load() async {
+    final p = await SharedPreferences.getInstance();
+    _localAvatar = p.getString('profile_avatar_path');
+    final remote = await SupabaseService.getProfile();
+    if (mounted) {
+      setState(() {
+        _profile = remote;
+        _localAvatar = p.getString('profile_avatar_path');
+      });
+    }
+  }
+
+  ImageProvider? get _avatar {
+    final url = _profile?['avatar_url']?.toString() ??
+        _profile?['photo_uri']?.toString();
+    if (url != null && url.startsWith('http')) return NetworkImage(url);
+    if (_localAvatar != null && File(_localAvatar!).existsSync()) {
+      return FileImage(File(_localAvatar!));
+    }
+    return null;
   }
 
   @override
@@ -30,6 +53,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _profile?['username']?.toString() ??
         (SupabaseService.isGuest ? 'Invitado' : 'Usuario');
     final isOwner = SupabaseService.isOwner;
+    final bio = _profile?['bio']?.toString() ?? '';
+    final banner = _profile?['banner_url']?.toString() ??
+        _profile?['banner_uri']?.toString();
+    final av = _avatar;
 
     return Scaffold(
       appBar: AppBar(
@@ -44,58 +71,74 @@ class _ProfileScreenState extends State<ProfileScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
         children: [
+          if (banner != null && banner.startsWith('http'))
+            ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: AspectRatio(
+                aspectRatio: 16 / 6,
+                child: Image.network(banner, fit: BoxFit.cover),
+              ),
+            ),
+          const SizedBox(height: 16),
           Center(
             child: Stack(
               children: [
                 CircleAvatar(
                   radius: 48,
                   backgroundColor: cs.surfaceContainerHighest,
-                  child: Icon(Icons.person, size: 48, color: cs.onSurface.withOpacity(0.4)),
+                  backgroundImage: av,
+                  child: av == null
+                      ? Icon(Icons.person,
+                          size: 48, color: cs.onSurface.withOpacity(0.4))
+                      : null,
                 ),
                 if (isOwner)
                   Positioned(
                     right: 0,
                     bottom: 0,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
                         color: cs.primary,
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Text('OWNER',
+                      child: Text('OWNER',
                           style: TextStyle(
+                              color: cs.onPrimary,
                               fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.white)),
+                              fontWeight: FontWeight.w800)),
                     ),
                   ),
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           Text(name,
               textAlign: TextAlign.center,
               style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
                   color: cs.onSurface)),
-          const SizedBox(height: 8),
-          Text(
-            'Themes · banners GIF · stickers · fuentes\n(customización completa en siguientes iteraciones)',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: cs.onSurface.withOpacity(0.45), height: 1.4),
-          ),
+          if (bio.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(bio,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: cs.onSurface.withOpacity(0.55))),
+          ],
           const SizedBox(height: 28),
           ListTile(
             leading: const Icon(Icons.palette_outlined),
             title: const Text('Personalizar perfil'),
             subtitle: const Text('Stickers, banner, theme'),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.push(
+            onTap: () async {
+              await Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const ProfileCustomizeScreen()),
+                MaterialPageRoute(
+                    builder: (_) => const ProfileCustomizeScreen()),
               );
+              _load();
             },
           ),
           if (SettingsService.instance.flag('friends_map'))
@@ -118,15 +161,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 MaterialPageRoute(builder: (_) => const ChatListScreen()),
               ),
             ),
-          if (SupabaseService.isLoggedIn && !SupabaseService.isGuest)
-            ListTile(
-              leading: const Icon(Icons.logout),
-              title: const Text('Cerrar sesión'),
-              onTap: () async {
-                await SupabaseService.signOut();
-                if (context.mounted) Navigator.pop(context);
-              },
-            ),
+          ListTile(
+            leading: const Icon(Icons.logout),
+            title: const Text('Cerrar sesión'),
+            onTap: () async {
+              await SupabaseService.signOut();
+              if (context.mounted) Navigator.of(context).pop();
+            },
+          ),
         ],
       ),
     );
