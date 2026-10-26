@@ -7,7 +7,8 @@ import 'package:pokke/services/voice_search_service.dart';
 import 'package:pokke/services/music_api_service.dart';
 import 'package:pokke/services/supabase_service.dart';
 
-/// Virtual remote. Voice uses the **phone microphone**.
+/// Virtual remote shaped like a Google TV / Android TV remote.
+/// Voice always uses the **phone microphone**.
 class RemoteControlScreen extends StatefulWidget {
   const RemoteControlScreen({super.key});
   @override
@@ -17,7 +18,6 @@ class RemoteControlScreen extends StatefulWidget {
 class _RemoteControlScreenState extends State<RemoteControlScreen> {
   double _vol = 0.8;
   bool _listening = false;
-  String? _lastHeard;
   String? _status;
 
   @override
@@ -28,178 +28,22 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
     VoiceSearchService.instance.init();
   }
 
-  void _cmd(String name, VoidCallback action) {
-    HapticFeedback.lightImpact();
-    action();
-    setState(() => _status = name);
-  }
+  void _haptic() => HapticFeedback.lightImpact();
 
-  /// Parse spoken command (ES / EN) and execute.
-  Future<void> _handleVoiceText(String raw) async {
-    final t = raw.toLowerCase().trim();
-    setState(() {
-      _lastHeard = raw;
-      _status = 'Oí: $raw';
-    });
-    final pc = PlayerController.instance;
-
-    // Transport
-    if (_match(t, [
-      'play', 'reproduce', 'reproducir', 'continua', 'continuar', 'resume',
-      'dale play', 'pon play'
-    ])) {
-      _cmd('Play', () => pc.resume());
-      return;
-    }
-    if (_match(t, [
-      'pause', 'pausa', 'pausar', 'para', 'detener', 'stop', 'detén'
-    ])) {
-      _cmd('Pausa', () => pc.pause());
-      return;
-    }
-    if (_match(t, [
-      'siguiente', 'next', 'adelante', 'otra canción', 'skip'
-    ])) {
-      _cmd('Siguiente', () => pc.next());
-      return;
-    }
-    if (_match(t, [
-      'anterior', 'previous', 'atrás', 'atras', 'la de antes'
-    ])) {
-      _cmd('Anterior', () => pc.previous());
-      return;
-    }
-    if (_match(t, ['mute', 'silencio', 'calla', 'sin volumen'])) {
-      _cmd('Mute', () {
-        pc.setVolume(0);
-        setState(() => _vol = 0);
-      });
-      return;
-    }
-    if (_match(t, [
-      'sube el volumen', 'más volumen', 'volume up', 'sube volumen', 'más alto'
-    ])) {
-      final v = (_vol + 0.15).clamp(0.0, 1.0);
-      _cmd('Vol +', () {
-        pc.setVolume(v);
-        setState(() => _vol = v);
-      });
-      return;
-    }
-    if (_match(t, [
-      'baja el volumen', 'menos volumen', 'volume down', 'baja volumen', 'más bajo'
-    ])) {
-      final v = (_vol - 0.15).clamp(0.0, 1.0);
-      _cmd('Vol −', () {
-        pc.setVolume(v);
-        setState(() => _vol = v);
-      });
-      return;
-    }
-
-    // "pon / reproduce / play [song]"
-    String? query;
-    for (final prefix in [
-      'reproduce ',
-      'pon la canción ',
-      'pon canción ',
-      'pon ',
-      'play ',
-      'busca ',
-      'buscar ',
-      'quiero oír ',
-      'quiero escuchar ',
-      'escucha ',
-    ]) {
-      if (t.startsWith(prefix)) {
-        query = t.substring(prefix.length).trim();
-        break;
-      }
-    }
-    // bare query fallback if long enough
-    if ((query == null || query.isEmpty) && t.split(' ').length >= 2) {
-      query = t;
-    }
-    if (query != null && query.isNotEmpty) {
-      setState(() => _status = 'Buscando “$query”…');
-      await _playQuery(query);
-      return;
-    }
-
-    setState(() => _status = 'No entendí. Prueba: “siguiente”, “pausa”, “pon unhappy”');
-  }
-
-  bool _match(String t, List<String> keys) {
-    for (final k in keys) {
-      if (t == k || t.contains(k)) return true;
-    }
-    return false;
-  }
-
-  Future<void> _playQuery(String q) async {
-    try {
-      List<Map<String, dynamic>> hits = [];
-      try {
-        hits = await MusicApiService.search(q);
-      } catch (_) {}
-      if (hits.isEmpty) {
-        final all = await SupabaseService.getSongs(limit: 80);
-        final ql = q.toLowerCase();
-        hits = all.where((s) {
-          final title = (s['title'] ?? '').toString().toLowerCase();
-          final artist = (s['artist'] ?? '').toString().toLowerCase();
-          return title.contains(ql) || artist.contains(ql) || ql.contains(title);
-        }).toList();
-      }
-      if (hits.isEmpty) {
-        setState(() => _status = 'No encontré “$q”');
-        return;
-      }
-      final song = hits.first;
-      await PlayerController.instance.play(song, asQueue: hits, index: 0);
-      setState(() {
-        _status =
-            '♪ ${song['title'] ?? q} — ${song['artist'] ?? ''}';
-      });
-    } catch (e) {
-      setState(() => _status = 'Error: $e');
-    }
-  }
-
-  Future<void> _listen() async {
-    if (_listening) {
-      await VoiceSearchService.instance.stop();
-      setState(() => _listening = false);
-      return;
-    }
-    setState(() {
-      _listening = true;
-      _status = 'Escuchando (mic del teléfono)…';
-    });
-    HapticFeedback.mediumImpact();
-    final text = await VoiceSearchService.instance.listenOnce(
-      timeout: const Duration(seconds: 7),
-    );
-    if (!mounted) return;
-    setState(() => _listening = false);
-    if (text == null || text.isEmpty) {
-      setState(() => _status = 'No escuché nada. Revisa permiso de micrófono.');
-      return;
-    }
-    await _handleVoiceText(text);
-  }
-
-  Widget _pad(IconData icon, String label, VoidCallback onTap,
-      {double size = 56, Color? color}) {
-    return Semantics(
-      button: true,
-      label: label,
+  Widget _round(IconData icon, VoidCallback onTap,
+      {double size = 48, Color bg = const Color(0xFF2A2A2E), String? tip}) {
+    return Tooltip(
+      message: tip ?? '',
       child: Material(
-        color: color ?? Colors.white10,
+        color: bg,
         shape: const CircleBorder(),
+        elevation: 2,
         child: InkWell(
           customBorder: const CircleBorder(),
-          onTap: () => _cmd(label, onTap),
+          onTap: () {
+            _haptic();
+            onTap();
+          },
           child: SizedBox(
             width: size,
             height: size,
@@ -210,132 +54,331 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
     );
   }
 
+  Future<void> _listen() async {
+    if (_listening) {
+      await VoiceSearchService.instance.stop();
+      setState(() => _listening = false);
+      return;
+    }
+    setState(() {
+      _listening = true;
+      _status = 'Escuchando…';
+    });
+    final text = await VoiceSearchService.instance
+        .listenOnce(timeout: const Duration(seconds: 7));
+    if (!mounted) return;
+    setState(() => _listening = false);
+    if (text == null || text.isEmpty) {
+      setState(() => _status = 'Sin audio — revisa el micrófono');
+      return;
+    }
+    await _handleVoice(text);
+  }
+
+  Future<void> _handleVoice(String raw) async {
+    final t = raw.toLowerCase().trim();
+    setState(() => _status = '“$raw”');
+    final pc = PlayerController.instance;
+    if (RegExp(r'play|reproduce|continua').hasMatch(t)) {
+      await pc.resume();
+      return;
+    }
+    if (RegExp(r'pausa|pause|stop|para').hasMatch(t)) {
+      await pc.pause();
+      return;
+    }
+    if (RegExp(r'siguiente|next|skip').hasMatch(t)) {
+      await pc.next();
+      return;
+    }
+    if (RegExp(r'anterior|previous|atr[aá]s').hasMatch(t)) {
+      await pc.previous();
+      return;
+    }
+    // search
+    var q = t;
+    for (final p in ['pon ', 'reproduce ', 'busca ', 'play ']) {
+      if (t.startsWith(p)) {
+        q = t.substring(p.length);
+        break;
+      }
+    }
+    setState(() => _status = 'Buscando $q…');
+    try {
+      var hits = <Map<String, dynamic>>[];
+      try {
+        hits = await MusicApiService.search(q);
+      } catch (_) {}
+      if (hits.isEmpty) {
+        final all = await SupabaseService.getSongs(limit: 80);
+        final ql = q.toLowerCase();
+        hits = all
+            .where((s) =>
+                '${s['title']}'.toLowerCase().contains(ql) ||
+                '${s['artist']}'.toLowerCase().contains(ql))
+            .toList();
+      }
+      if (hits.isEmpty) {
+        setState(() => _status = 'No encontré $q');
+        return;
+      }
+      await PlayerController.instance.play(hits.first, asQueue: hits, index: 0);
+      setState(() => _status = '♪ ${hits.first['title']}');
+    } catch (e) {
+      setState(() => _status = '$e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final linked = DeviceLinkService.instance.linked;
     final pc = PlayerController.instance;
+    final linked = DeviceLinkService.instance.linked;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0B0B0F),
+      backgroundColor: const Color(0xFF121214),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
-        title: const Text('Control remoto'),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Control remoto'),
+            Text(
+              linked ? 'TV vinculada' : 'Este teléfono · mic local',
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w400),
+            ),
+          ],
+        ),
       ),
       body: ListenableBuilder(
-        listenable: Listenable.merge([pc, DevicesService.instance]),
+        listenable: pc,
         builder: (_, __) {
           final song = pc.current;
-          final title = song?['title']?.toString() ?? 'Nada en reproducción';
-          final artist = song?['artist']?.toString() ?? '';
-          return Padding(
-            padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-            child: Column(
-              children: [
-                Text(
-                  linked
-                      ? 'TV vinculada · el mic es del teléfono'
-                      : 'Mic del teléfono · controla la reproducción',
-                  style: TextStyle(color: Colors.white.withOpacity(0.55)),
-                  textAlign: TextAlign.center,
+          return Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Container(
+                width: 280,
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1C1C1F),
+                  borderRadius: BorderRadius.circular(36),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.5),
+                      blurRadius: 24,
+                      offset: const Offset(0, 12),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 12),
-                Text(title,
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800)),
-                Text(artist,
-                    style: TextStyle(color: Colors.white.withOpacity(0.5))),
-                if (_status != null) ...[
-                  const SizedBox(height: 10),
-                  Text(_status!,
-                      textAlign: TextAlign.center,
+                child: Column(
+                  children: [
+                    // Now playing
+                    Text(
+                      song?['title']?.toString() ?? 'Pokke Remote',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14),
+                    ),
+                    Text(
+                      song?['artist']?.toString() ??
+                          'Mic del teléfono · comandos de voz',
+                      maxLines: 1,
                       style: TextStyle(
-                          color: _listening
-                              ? Colors.lightBlueAccent
-                              : Colors.white70,
-                          fontSize: 13)),
-                ],
-                if (_lastHeard != null)
-                  Text('“$_lastHeard”',
-                      style: TextStyle(
-                          color: Colors.white.withOpacity(0.35),
-                          fontSize: 12)),
-                const Spacer(),
-                // Big mic button
-                GestureDetector(
-                  onTap: _listen,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    width: 88,
-                    height: 88,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: _listening
-                          ? Colors.redAccent.withOpacity(0.9)
-                          : Colors.lightBlueAccent.withOpacity(0.85),
-                      boxShadow: [
-                        BoxShadow(
-                          color: (_listening
+                          color: Colors.white.withOpacity(0.45), fontSize: 11),
+                    ),
+                    if (_status != null) ...[
+                      const SizedBox(height: 6),
+                      Text(_status!,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                              color: _listening
                                   ? Colors.redAccent
-                                  : Colors.lightBlueAccent)
-                              .withOpacity(0.45),
-                          blurRadius: _listening ? 28 : 16,
+                                  : Colors.lightBlueAccent,
+                              fontSize: 11)),
+                    ],
+                    const SizedBox(height: 18),
+                    // Power / mute row
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _round(Icons.power_settings_new, () => pc.pause(),
+                            size: 44,
+                            bg: const Color(0xFF3A1515),
+                            tip: 'Stop'),
+                        _round(
+                          Icons.volume_off,
+                          () {
+                            final v = _vol > 0 ? 0.0 : 0.8;
+                            setState(() => _vol = v);
+                            pc.setVolume(v);
+                          },
+                          size: 44,
+                          tip: 'Mute',
                         ),
                       ],
                     ),
-                    child: Icon(
-                      _listening ? Icons.mic : Icons.mic_none,
-                      color: Colors.white,
-                      size: 40,
+                    const SizedBox(height: 14),
+                    // Assistant / voice / settings
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _round(Icons.person_outline, () {}, size: 42),
+                        GestureDetector(
+                          onTap: _listen,
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            width: 56,
+                            height: 56,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: LinearGradient(
+                                colors: _listening
+                                    ? [Colors.redAccent, Colors.orange]
+                                    : [
+                                        const Color(0xFF4285F4),
+                                        const Color(0xFF34A853),
+                                        const Color(0xFFFBBC05),
+                                        const Color(0xFFEA4335),
+                                      ],
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: (_listening
+                                          ? Colors.redAccent
+                                          : const Color(0xFF4285F4))
+                                      .withOpacity(0.45),
+                                  blurRadius: 16,
+                                ),
+                              ],
+                            ),
+                            child: Icon(
+                              _listening ? Icons.mic : Icons.mic_none,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                        _round(Icons.settings_outlined, () {}, size: 42),
+                      ],
                     ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _listening
-                      ? 'Escuchando… toca para parar'
-                      : 'Toca el mic · “siguiente”, “pausa”, “pon unhappy”',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                      color: Colors.white.withOpacity(0.5), fontSize: 12),
-                ),
-                const SizedBox(height: 24),
-                // Transport
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _pad(Icons.skip_previous, 'Anterior', () => pc.previous()),
-                    _pad(
-                      pc.playing ? Icons.pause : Icons.play_arrow,
-                      pc.playing ? 'Pausa' : 'Play',
-                      () => pc.playing ? pc.pause() : pc.resume(),
-                      size: 72,
-                      color: Colors.white24,
-                    ),
-                    _pad(Icons.skip_next, 'Siguiente', () => pc.next()),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    const Icon(Icons.volume_down, color: Colors.white70),
-                    Expanded(
-                      child: Slider(
-                        value: _vol,
-                        onChanged: (v) {
-                          setState(() => _vol = v);
-                          pc.setVolume(v);
-                        },
+                    const SizedBox(height: 22),
+                    // D-pad ring
+                    SizedBox(
+                      width: 168,
+                      height: 168,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Container(
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Color(0xFF2A2A2E),
+                            ),
+                          ),
+                          // directions
+                          Positioned(
+                            top: 8,
+                            child: IconButton(
+                              onPressed: () => _haptic(),
+                              icon: const Icon(Icons.keyboard_arrow_up,
+                                  color: Colors.white70, size: 32),
+                            ),
+                          ),
+                          Positioned(
+                            bottom: 8,
+                            child: IconButton(
+                              onPressed: () => _haptic(),
+                              icon: const Icon(Icons.keyboard_arrow_down,
+                                  color: Colors.white70, size: 32),
+                            ),
+                          ),
+                          Positioned(
+                            left: 8,
+                            child: IconButton(
+                              onPressed: () {
+                                _haptic();
+                                pc.previous();
+                              },
+                              icon: const Icon(Icons.keyboard_arrow_left,
+                                  color: Colors.white70, size: 32),
+                            ),
+                          ),
+                          Positioned(
+                            right: 8,
+                            child: IconButton(
+                              onPressed: () {
+                                _haptic();
+                                pc.next();
+                              },
+                              icon: const Icon(Icons.keyboard_arrow_right,
+                                  color: Colors.white70, size: 32),
+                            ),
+                          ),
+                          // OK / play-pause
+                          Material(
+                            color: const Color(0xFF3A3A40),
+                            shape: const CircleBorder(),
+                            child: InkWell(
+                              customBorder: const CircleBorder(),
+                              onTap: () {
+                                _haptic();
+                                pc.playing ? pc.pause() : pc.resume();
+                              },
+                              child: SizedBox(
+                                width: 64,
+                                height: 64,
+                                child: Icon(
+                                  pc.playing ? Icons.pause : Icons.play_arrow,
+                                  color: Colors.white,
+                                  size: 32,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const Icon(Icons.volume_up, color: Colors.white70),
+                    const SizedBox(height: 18),
+                    // Back / home / menu
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _round(Icons.arrow_back, () => Navigator.maybePop(context),
+                            size: 46, tip: 'Atrás'),
+                        _round(Icons.home_outlined, () {
+                          Navigator.of(context)
+                              .popUntil((r) => r.isFirst);
+                        }, size: 46, tip: 'Home'),
+                        _round(Icons.menu, () {}, size: 46, tip: 'Menú'),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    // Volume
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _round(Icons.remove, () {
+                          final v = (_vol - 0.1).clamp(0.0, 1.0);
+                          setState(() => _vol = v);
+                          pc.setVolume(v);
+                        }, size: 44, tip: 'Vol −'),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Text('${(_vol * 100).round()}%',
+                              style: const TextStyle(color: Colors.white70)),
+                        ),
+                        _round(Icons.add, () {
+                          final v = (_vol + 0.1).clamp(0.0, 1.0);
+                          setState(() => _vol = v);
+                          pc.setVolume(v);
+                        }, size: 44, tip: 'Vol +'),
+                      ],
+                    ),
                   ],
                 ),
-                const Spacer(),
-              ],
+              ),
             ),
           );
         },
