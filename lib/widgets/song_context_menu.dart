@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:pokke/adaptive/breakpoints.dart';
@@ -14,6 +15,7 @@ Future<void> showSongContextMenu(
   final title = song['title']?.toString() ?? 'Canción';
   final artist = song['artist']?.toString() ?? '';
   final useGlass = SettingsService.instance.liquidGlassEnabled;
+  final cs = Theme.of(context).colorScheme;
 
   Widget tile({
     required IconData icon,
@@ -21,8 +23,10 @@ Future<void> showSongContextMenu(
     required VoidCallback onTap,
   }) {
     return ListTile(
-      leading: Icon(icon),
-      title: Text(label),
+      leading: Icon(icon, color: cs.onSurface.withOpacity(0.9)),
+      title: Text(label,
+          style: TextStyle(
+              color: cs.onSurface, fontWeight: FontWeight.w500)),
       onTap: () {
         Navigator.pop(context);
         onTap();
@@ -30,90 +34,105 @@ Future<void> showSongContextMenu(
     );
   }
 
-  final body = Column(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Padding(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w700, fontSize: 16)),
-                  Text(artist,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurface
-                              .withOpacity(0.5))),
-                ],
-              ),
+  final items = <Widget>[
+    Padding(
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                        color: cs.onSurface)),
+                Text(artist,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        color: cs.onSurface.withOpacity(0.5))),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
-      const Divider(height: 1),
-      if (!isTv)
-        tile(
-          icon: Icons.cast_outlined,
-          label: 'Transmitir',
-          onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                  content: Text('Transmitir: elige un dispositivo en el chip del player')),
-            );
-          },
-        ),
+    ),
+    Divider(height: 1, color: cs.onSurface.withOpacity(0.08)),
+    if (!isTv)
       tile(
-        icon: Icons.share_outlined,
-        label: 'Compartir',
-        onTap: () => Share.share('$title — $artist · Pokke'),
-      ),
-      tile(
-        icon: Icons.download_outlined,
-        label: 'Descargar (offline)',
-        onTap: () async {
-          final ok = await OfflineService.instance.downloadSong(song);
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                  content: Text(ok
-                      ? 'Descargada en Music/Pokke'
-                      : 'No se pudo descargar')),
-            );
-          }
+        icon: Icons.cast_outlined,
+        label: 'Transmitir',
+        onTap: () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text(
+                    'Transmitir: elige un dispositivo en el chip del player')),
+          );
         },
       ),
-      tile(
-        icon: Icons.playlist_add,
-        label: 'Agregar a playlist',
-        onTap: () => onAddToPlaylist?.call(),
-      ),
-      const SizedBox(height: 12),
-    ],
+    tile(
+      icon: Icons.share_outlined,
+      label: 'Compartir',
+      onTap: () => Share.share('$title — $artist · Pokke'),
+    ),
+    tile(
+      icon: Icons.download_outlined,
+      label: 'Descargar (offline)',
+      onTap: () {
+        OfflineService.instance.downloadSong(song);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Descarga iniciada')),
+        );
+      },
+    ),
+    tile(
+      icon: Icons.playlist_add,
+      label: 'Agregar a playlist',
+      onTap: () {
+        if (onAddToPlaylist != null) {
+          onAddToPlaylist();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Abre Library → playlist')),
+          );
+        }
+      },
+    ),
+    const SizedBox(height: 8),
+  ];
+
+  final panel = ClipRRect(
+    borderRadius: BorderRadius.circular(20),
+    child: useGlass
+        ? BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+            child: Container(
+              decoration: BoxDecoration(
+                color: cs.surface.withOpacity(0.55),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white.withOpacity(0.14)),
+              ),
+              child: Column(mainAxisSize: MainAxisSize.min, children: items),
+            ),
+          )
+        : LiquidGlass(
+            borderRadius: BorderRadius.circular(20),
+            child: Column(mainAxisSize: MainAxisSize.min, children: items),
+          ),
   );
 
   if (isTv) {
     return showDialog(
       context: context,
       barrierColor: Colors.black54,
-      builder: (ctx) => Center(
-        child: Material(
-          color: const Color(0xFF1C1C1F),
-          elevation: 12,
-          borderRadius: BorderRadius.circular(16),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420, minWidth: 320),
-            child: body,
-          ),
+      builder: (_) => Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420, minWidth: 320),
+          child: panel,
         ),
       ),
     );
@@ -122,19 +141,13 @@ Future<void> showSongContextMenu(
   return showModalBottomSheet(
     context: context,
     backgroundColor: Colors.transparent,
-    builder: (_) {
-      final sheet = Material(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        child: SafeArea(top: false, child: body),
-      );
-      if (useGlass) {
-        return LiquidGlass(
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-          child: sheet,
-        );
-      }
-      return sheet;
-    },
+    barrierColor: Colors.black45,
+    isScrollControlled: true,
+    builder: (_) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        child: panel,
+      ),
+    ),
   );
 }
