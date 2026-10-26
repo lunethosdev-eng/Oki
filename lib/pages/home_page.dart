@@ -6,6 +6,9 @@ import 'package:pokke/screens/settings_screen.dart';
 import 'package:pokke/screens/profile_screen.dart';
 import 'package:pokke/pages/music_player_page.dart';
 import 'package:pokke/adaptive/breakpoints.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:io';
+import 'package:pokke/widgets/song_context_menu.dart';
 import 'package:pokke/widgets/player_route.dart';
 
 class HomePage extends StatefulWidget {
@@ -18,11 +21,26 @@ class _HomePageState extends State<HomePage> {
   List<Map<String, dynamic>> _songs = [];
   bool _loading = true;
   double _scroll = 0;
+  String? _avatarUrl;
+  String? _avatarPath;
 
   @override
   void initState() {
     super.initState();
     _load();
+    _loadAvatar();
+  }
+
+  Future<void> _loadAvatar() async {
+    final pref = await SharedPreferences.getInstance();
+    final path = pref.getString('profile_avatar_path');
+    final prof = await SupabaseService.getProfile();
+    if (!mounted) return;
+    setState(() {
+      _avatarPath = path;
+      _avatarUrl = prof?['avatar_url']?.toString() ??
+          prof?['photo_uri']?.toString();
+    });
   }
 
   Future<void> _load() async {
@@ -107,14 +125,37 @@ class _HomePageState extends State<HomePage> {
                             ),
                             IconButton(
                               tooltip: 'Profile',
-                              onPressed: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (_) =>
-                                        const ProfileScreen()),
+                              onPressed: () async {
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (_) =>
+                                          const ProfileScreen()),
+                                );
+                                _loadAvatar();
+                              },
+                              icon: CircleAvatar(
+                                radius: 14,
+                                backgroundColor: cs.surfaceContainerHighest,
+                                backgroundImage: () {
+                                  if (_avatarUrl != null &&
+                                      _avatarUrl!.startsWith('http')) {
+                                    return NetworkImage(_avatarUrl!);
+                                  }
+                                  if (_avatarPath != null &&
+                                      File(_avatarPath!).existsSync()) {
+                                    return FileImage(File(_avatarPath!));
+                                  }
+                                  return null;
+                                }(),
+                                child: (_avatarUrl == null &&
+                                        (_avatarPath == null ||
+                                            !File(_avatarPath ?? '')
+                                                .existsSync()))
+                                    ? Icon(Icons.person_outline,
+                                        size: 16, color: cs.onSurface)
+                                    : null,
                               ),
-                              icon: Icon(Icons.person_outline,
-                                  color: cs.onSurface),
                             ),
                           ],
                         ),
@@ -161,6 +202,7 @@ class _HomePageState extends State<HomePage> {
                     return InkWell(
                       borderRadius: BorderRadius.circular(12),
                       onTap: () => _play(s, i),
+                      onLongPress: () => showSongContextMenu(context, song: s),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
