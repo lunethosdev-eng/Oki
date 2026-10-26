@@ -36,13 +36,39 @@ class _AdaptiveShellState extends State<AdaptiveShell>
   late final AnimationController _collapseCtrl;
   late final AnimationController _searchDetachCtrl;
 
-  final _pages = const [
-    HomePage(),
-    BrowsePage(),
-    RadioPage(),
-    LibraryPage(),
-    SearchPage(),
-  ];
+  // Phone: Home, Browse, [Chat if beta], Library, Search — no Radio
+  List<Widget> get _pages {
+    final chat = SettingsService.instance.flag('private_chat');
+    return [
+      const HomePage(),
+      const BrowsePage(),
+      if (chat) const ChatListScreen(),
+      const LibraryPage(),
+      const SearchPage(),
+    ];
+  }
+
+  List<String> get _labels {
+    final chat = SettingsService.instance.flag('private_chat');
+    return [
+      'Home',
+      'Browse',
+      if (chat) 'Chat',
+      'Library',
+      'Search',
+    ];
+  }
+
+  List<IconData> get _icons {
+    final chat = SettingsService.instance.flag('private_chat');
+    return [
+      Icons.home_rounded,
+      Icons.explore_outlined,
+      if (chat) Icons.chat_bubble_outline_rounded,
+      Icons.library_music_rounded,
+      Icons.search_rounded,
+    ];
+  }
 
   // TV simplified: Home / Search / Library
   static const _tvLabels = ['Home', 'Search', 'Your Library'];
@@ -51,16 +77,14 @@ class _AdaptiveShellState extends State<AdaptiveShell>
     Icons.search_rounded,
     Icons.library_music_outlined,
   ];
-  static const _tvPageIdx = [0, 4, 3];
-
-  static const _labels = ['Home', 'Browse', 'Radio', 'Library', 'Search'];
-  static const _icons = [
-    Icons.home_rounded,
-    Icons.explore_outlined,
-    Icons.podcasts_rounded,
-    Icons.library_music_rounded,
-    Icons.search_rounded,
-  ];
+  // Map TV tabs to page indices in dynamic list without chat: 0,3,2 — with chat: 0,4,3
+  List<int> get _tvPageIdx {
+    final chat = SettingsService.instance.flag('private_chat');
+    // pages: Home, Browse, [Chat?], Library, Search
+    // TV wants Home / Search / Library
+    if (chat) return [0, 4, 3]; // Home, Search, Library
+    return [0, 3, 2]; // Home, Search, Library
+  }
 
   @override
   void initState() {
@@ -104,6 +128,11 @@ class _AdaptiveShellState extends State<AdaptiveShell>
     return false;
   }
 
+  void _clampIndex() {
+    final max = _pages.length - 1;
+    if (_index > max) setState(() => _index = max.clamp(0, max));
+  }
+
   void _openChat() {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const ChatListScreen()),
@@ -123,6 +152,7 @@ class _AdaptiveShellState extends State<AdaptiveShell>
 
   @override
   Widget build(BuildContext context) {
+    _clampIndex();
     final form = Breakpoints.of(context);
     return NotificationListener<ScrollNotification>(
       onNotification: _onScroll,
