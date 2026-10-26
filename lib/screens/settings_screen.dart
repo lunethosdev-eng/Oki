@@ -7,6 +7,7 @@ import 'package:pokke/screens/listen_together_screen.dart';
 import 'package:pokke/screens/friends_map_screen.dart';
 import 'package:pokke/screens/chat_list_screen.dart';
 import 'package:pokke/screens/device_link_screen.dart';
+import 'package:pokke/screens/owner_panel_screen.dart';
 import 'package:pokke/adaptive/breakpoints.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -187,6 +188,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     context,
                     MaterialPageRoute(
                       builder: (_) => DeviceLinkScreen(asTvHost: isTv),
+
+              if (SupabaseService.isOwner)
+                ListTile(
+                  leading: const Icon(Icons.admin_panel_settings_outlined),
+                  title: const Text('Owner panel'),
+                  subtitle: const Text('Servidor, covers, catálogo'),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const OwnerPanelScreen()),
+                  ),
+                ),
                     ),
                   );
                 },
