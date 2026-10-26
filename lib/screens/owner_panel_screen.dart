@@ -1,9 +1,10 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:pokke/services/music_api_service.dart';
 import 'package:pokke/services/settings_service.dart';
 import 'package:pokke/services/supabase_service.dart';
 
-/// Owner-only: music server URL, catalog covers, animated covers.
 class OwnerPanelScreen extends StatefulWidget {
   const OwnerPanelScreen({super.key});
   @override
@@ -14,10 +15,13 @@ class _OwnerPanelScreenState extends State<OwnerPanelScreen> {
   final _server = TextEditingController();
   final _coverUrl = TextEditingController();
   final _animUrl = TextEditingController();
+  final _search = TextEditingController();
   List<Map<String, dynamic>> _songs = [];
-  List<Map<String, dynamic>> _noCover = [];
+  List<Map<String, dynamic>> _filtered = [];
   bool _loading = true;
+  bool _onlyMissing = true;
   String? _selectedId;
+  String? _selectedTitle;
 
   @override
   void initState() {
@@ -31,23 +35,36 @@ class _OwnerPanelScreenState extends State<OwnerPanelScreen> {
     _server.dispose();
     _coverUrl.dispose();
     _animUrl.dispose();
+    _search.dispose();
     super.dispose();
   }
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    final all = await SupabaseService.getSongs(limit: 200);
-    final missing = all.where((s) {
-      final c = (s['cover_url'] ?? s['cover'] ?? '').toString();
-      return c.isEmpty || !c.startsWith('http');
-    }).toList();
+    // fetch in chunks
+    final all = <Map<String, dynamic>>[];
+    var batch = await SupabaseService.getSongs(limit: 500);
+    all.addAll(batch);
     if (mounted) {
       setState(() {
         _songs = all;
-        _noCover = missing;
+        _applyFilter();
         _loading = false;
       });
     }
+  }
+
+  void _applyFilter() {
+    final q = _search.text.trim().toLowerCase();
+    _filtered = _songs.where((s) {
+      final c = (s['cover_url'] ?? s['cover'] ?? '').toString();
+      final missing = c.isEmpty || !c.startsWith('http');
+      if (_onlyMissing && !missing) return false;
+      if (q.isEmpty) return true;
+      final title = (s['title'] ?? '').toString().toLowerCase();
+      final artist = (s['artist'] ?? '').toString().toLowerCase();
+      return title.contains(q) || artist.contains(q);
+    }).toList();
   }
 
   Future<void> _saveServer() async {
@@ -58,11 +75,18 @@ class _OwnerPanelScreenState extends State<OwnerPanelScreen> {
     }
   }
 
-  Future<void> _saveCover({bool animated = false}) async {
+  Future<void> _pickAndUpload({required bool animated}) async {
     if (_selectedId == null) return;
-    final url = animated ? _animUrl.text.trim() : _coverUrl.text.trim();
-    if (url.isEmpty) return;
+    final x = await ImagePicker().pickImage(
+        source: ImageSource.gallery, maxWidth: 1600, imageQuality: 90);
+    if (x == null) return;
     try {
+      final bytes = await File(x.path).readAsBytes();
+      final name =
+          'covers/${_selectedId}_${animated ? 'anim' : 'static'}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      await SupabaseService.ukiyo.storage.from('covers').uploadBinary(name, bytes);
+      final url =
+          SupabaseService.ukiyo.storage.from('covers').getPublicUrl(name);
       final data = animated
           ? {'animated_cover_url': url}
           : {'cover_url': url};
@@ -70,9 +94,45 @@ class _OwnerPanelScreenState extends State<OwnerPanelScreen> {
           .from('songs')
           .update(data)
           .eq('id', _selectedId!);
+      if (animated) {
+        _animUrl.text = url;
+      } else {
+        _coverUrl.text = url;
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(animated ? 'Cover animado guardado' : 'Cover guardado')),
+          SnackBar(
+              content: Text(animated
+                  ? 'Cover animado subido'
+                  : 'Cover subido desde galería')),
+        );
+      }
+      await _load();
+    } catch (e) {
+      // fallback: store URL field only if storage fails — try update with file path not useful
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Upload: $e')));
+      }
+    }
+  }
+
+  Future<void> _saveCover({required bool animated}) async {
+    if (_selectedId == null) return;
+    final url = animated ? _animUrl.text.trim() : _coverUrl.text.trim();
+    if (url.isEmpty) return;
+    try {
+      final data =
+          animated ? {'animated_cover_url': url} : {'cover_url': url};
+      await SupabaseService.ukiyo
+          .from('songs')
+          .update(data)
+          .eq('id', _selectedId!);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content:
+                  Text(animated ? 'Cover animado guardado' : 'Cover guardado')),
         );
       }
       await _load();
@@ -87,11 +147,14 @@ class _OwnerPanelScreenState extends State<OwnerPanelScreen> {
   @override
   Widget build(BuildContext context) {
     if (!SupabaseService.isOwner) {
-      return const Scaffold(
-        body: Center(child: Text('Solo owner')),
-      );
+      return const Scaffold(body: Center(child: Text('Solo owner')));
     }
     final cs = Theme.of(context).colorScheme;
+    final missing = _songs.where((s) {
+      final c = (s['cover_url'] ?? s['cover'] ?? '').toString();
+      return c.isEmpty || !c.startsWith('http');
+    }).length;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Owner panel'),
@@ -100,7 +163,7 @@ class _OwnerPanelScreenState extends State<OwnerPanelScreen> {
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
         children: [
           Text('Servidor de música',
               style: TextStyle(fontWeight: FontWeight.w800, color: cs.onSurface)),
@@ -108,57 +171,121 @@ class _OwnerPanelScreenState extends State<OwnerPanelScreen> {
           TextField(
             controller: _server,
             decoration: const InputDecoration(
-              labelText: 'Base URL (Cloudflare tunnel / API)',
+              labelText: 'Base URL API',
               border: OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 8),
-          FilledButton(onPressed: _saveServer, child: const Text('Guardar URL')),
-          const SizedBox(height: 24),
-          Text('Catálogo (${_songs.length}) · sin cover: ${_noCover.length}',
+          FilledButton(
+              onPressed: _saveServer, child: const Text('Guardar URL')),
+          const SizedBox(height: 20),
+          Text('Catálogo (${_songs.length}) · sin cover: $missing',
               style: TextStyle(fontWeight: FontWeight.w800, color: cs.onSurface)),
           const SizedBox(height: 8),
+          TextField(
+            controller: _search,
+            decoration: const InputDecoration(
+              prefixIcon: Icon(Icons.search),
+              hintText: 'Buscar título / artista',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            onChanged: (_) => setState(_applyFilter),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Solo sin cover'),
+            value: _onlyMissing,
+            onChanged: (v) => setState(() {
+              _onlyMissing = v;
+              _applyFilter();
+            }),
+          ),
           if (_loading)
-            const Center(child: CircularProgressIndicator())
+            const Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(child: CircularProgressIndicator()),
+            )
           else
-            ..._noCover.take(40).map((s) {
+            ..._filtered.take(300).map((s) {
               final id = s['id']?.toString() ?? '';
               final title = s['title']?.toString() ?? '';
               final artist = s['artist']?.toString() ?? '';
               final selected = _selectedId == id;
+              final hasAnim =
+                  (s['animated_cover_url'] ?? '').toString().startsWith('http');
               return ListTile(
                 selected: selected,
-                title: Text(title),
+                title: Text(title, maxLines: 2, overflow: TextOverflow.ellipsis),
                 subtitle: Text(artist),
-                onTap: () => setState(() => _selectedId = id),
+                trailing: hasAnim
+                    ? const Icon(Icons.gif_box_outlined, size: 18)
+                    : null,
+                onTap: () => setState(() {
+                  _selectedId = id;
+                  _selectedTitle = title;
+                  _coverUrl.text = (s['cover_url'] ?? '').toString();
+                  _animUrl.text = (s['animated_cover_url'] ?? '').toString();
+                }),
               );
             }),
           if (_selectedId != null) ...[
-            const SizedBox(height: 12),
+            const Divider(),
+            Text('Editando: $_selectedTitle',
+                style: const TextStyle(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 8),
             TextField(
               controller: _coverUrl,
               decoration: const InputDecoration(
-                labelText: 'Cover URL (estático)',
+                labelText: 'Cover URL',
                 border: OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 8),
-            FilledButton.tonal(
-              onPressed: () => _saveCover(animated: false),
-              child: const Text('Guardar cover'),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.tonal(
+                    onPressed: () => _saveCover(animated: false),
+                    child: const Text('Guardar URL'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _pickAndUpload(animated: false),
+                    icon: const Icon(Icons.photo_library_outlined),
+                    label: const Text('Galería'),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _animUrl,
               decoration: const InputDecoration(
-                labelText: 'Cover animado URL (GIF/WebP/MP4)',
+                labelText: 'Cover animado URL (GIF/WebP)',
                 border: OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 8),
-            FilledButton.tonal(
-              onPressed: () => _saveCover(animated: true),
-              child: const Text('Guardar cover animado'),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.tonal(
+                    onPressed: () => _saveCover(animated: true),
+                    child: const Text('Guardar anim'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _pickAndUpload(animated: true),
+                    icon: const Icon(Icons.gif_box_outlined),
+                    label: const Text('Galería'),
+                  ),
+                ),
+              ],
             ),
           ],
         ],
