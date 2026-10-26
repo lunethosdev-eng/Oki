@@ -15,6 +15,7 @@ import 'package:pokke/pages/music_player_page.dart';
 import 'package:pokke/widgets/player_route.dart';
 import 'package:pokke/screens/settings_screen.dart';
 import 'package:pokke/screens/profile_screen.dart';
+import 'package:pokke/widgets/tv_side_panel.dart';
 import 'package:pokke/screens/chat_list_screen.dart';
 import 'package:pokke/screens/friends_map_screen.dart';
 import 'package:pokke/screens/listen_together_screen.dart';
@@ -475,20 +476,14 @@ class _AdaptiveShellState extends State<AdaptiveShell>
                     ),
                   const Spacer(),
                   IconButton(
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) => const SettingsScreen()),
-                    ),
+                    tooltip: 'Settings',
+                    onPressed: () => openTvSettings(context),
                     icon: const Icon(Icons.settings_outlined,
                         color: Colors.white70),
                   ),
                   IconButton(
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) => const ProfileScreen()),
-                    ),
+                    tooltip: 'Profile',
+                    onPressed: () => openTvProfile(context),
                     icon: const Icon(Icons.account_circle_outlined,
                         color: Colors.white70, size: 28),
                   ),
