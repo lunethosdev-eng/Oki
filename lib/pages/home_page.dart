@@ -166,7 +166,7 @@ class _HomePageState extends State<HomePage> {
           SliverToBoxAdapter(
             child: Padding(
               padding: EdgeInsets.fromLTRB(isTv ? 28 : 16, 16, 16, 8),
-              child: Text('Para ti',
+              child: Text('Hecho para ti',
                   style: TextStyle(
                       fontSize: isTv ? 22 : 18,
                       fontWeight: FontWeight.w800,
