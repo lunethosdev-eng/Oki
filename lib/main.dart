@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:pokke/services/settings_service.dart';
 import 'package:pokke/services/supabase_service.dart';
+import 'package:pokke/services/permissions_service.dart';
 import 'package:pokke/theme/app_theme.dart';
 import 'package:pokke/screens/welcome_screen.dart';
 import 'package:pokke/adaptive/adaptive_shell.dart';
@@ -18,6 +19,8 @@ Future<void> main() async {
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
   ));
+  // Request mic / location / notifications (runtime)
+  PermissionsService.requestCore();
   runApp(const PokkeApp());
 }
 
