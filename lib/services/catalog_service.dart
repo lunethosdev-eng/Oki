@@ -1,36 +1,33 @@
 import 'package:flutter/foundation.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:pokke/services/supabase_service.dart';
 
-class PermissionsService {
-  /// Request all runtime permissions Pokke needs.
-  /// Call from a user gesture (Settings tile) — more reliable than boot.
-  static Future<Map<Permission, PermissionStatus>> requestCore() async {
-    final wanted = <Permission>[
-      Permission.notification,
-      Permission.microphone,
-      Permission.locationWhenInUse,
-      Permission.audio,
-      Permission.photos,
-      Permission.videos,
-      Permission.storage, // pre-Android 13
-    ];
-    Map<Permission, PermissionStatus> result = {};
+/// Shared song catalog with live refresh after admin cover edits.
+class CatalogService extends ChangeNotifier {
+  static final CatalogService instance = CatalogService._();
+  CatalogService._();
+
+  List<Map<String, dynamic>> songs = [];
+  bool loading = false;
+  DateTime? lastFetch;
+
+  Future<List<Map<String, dynamic>>> refresh({int limit = 80}) async {
+    loading = true;
+    notifyListeners();
     try {
-      result = await wanted.request();
-      debugPrint('permissions: $result');
+      songs = await SupabaseService.getSongs(limit: limit);
+      lastFetch = DateTime.now();
     } catch (e) {
-      debugPrint('permissions request: $e');
+      debugPrint('catalog refresh: $e');
     }
-    try {
-      var p = await Geolocator.checkPermission();
-      if (p == LocationPermission.denied) {
-        p = await Geolocator.requestPermission();
-      }
-      debugPrint('geolocator: $p');
-    } catch (e) {
-      debugPrint('geolocator: $e');
-    }
-    return result;
+    loading = false;
+    notifyListeners();
+    return songs;
+  }
+
+  /// Call after owner panel updates a cover so Home/Search refresh.
+  void bump() {
+    notifyListeners();
+    // fire-and-forget reload
+    refresh();
   }
 }
