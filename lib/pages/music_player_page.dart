@@ -4,6 +4,7 @@ import 'package:pokke/services/devices_service.dart';
 import 'package:pokke/services/settings_service.dart';
 import 'package:pokke/widgets/tv_side_panel.dart';
 import 'package:pokke/widgets/player_background.dart';
+import 'package:pokke/widgets/song_context_menu.dart';
 import 'package:pokke/screens/artist_screen.dart';
 import 'package:pokke/widgets/karaoke_lyrics.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -133,6 +134,16 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                                         color: cs.onSurface)),
                               ],
                             ),
+                          ),
+                          IconButton(
+                            tooltip: 'Más',
+                            onPressed: () {
+                              final s = pc.current;
+                              if (s != null) {
+                                showSongContextMenu(context, song: s);
+                              }
+                            },
+                            icon: Icon(Icons.more_vert, color: cs.onSurface),
                           ),
                           IconButton(
                             tooltip: _following ? 'Siguiendo' : 'Seguir',
@@ -371,6 +382,16 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                         onPressed: () => openTvProfile(context),
                         icon: const Icon(Icons.account_circle_outlined,
                             color: Colors.white70, size: 28),
+                      ),
+                      IconButton(
+                        tooltip: 'Más',
+                        onPressed: () {
+                          final s = pc.current;
+                          if (s != null) {
+                            showSongContextMenu(context, song: s);
+                          }
+                        },
+                        icon: const Icon(Icons.more_vert, color: Colors.white70),
                       ),
                     ],
                   ),
