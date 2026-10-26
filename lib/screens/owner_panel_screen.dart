@@ -87,11 +87,9 @@ class _OwnerPanelScreenState extends State<OwnerPanelScreen> {
       // Upload to Kokoro public covers bucket (RLS-friendly)
       final storage = SupabaseService.kokoro.storage.from('covers');
       try {
-        await storage.uploadBinary(name, bytes);
-      } catch (_) {
-        await storage.uploadBinary(name, bytes, fileOptions:
-            const FileOptions(upsert: true));
-      }
+        await storage.remove([name]);
+      } catch (_) {}
+      await storage.uploadBinary(name, bytes);
       final url = storage.getPublicUrl(name);
       final data = animated
           ? {'animated_cover_url': url}
