@@ -129,8 +129,10 @@ class _AdaptiveShellState extends State<AdaptiveShell>
   }
 
   void _clampIndex() {
-    final max = _pages.length - 1;
-    if (_index > max) setState(() => _index = max.clamp(0, max));
+    final max = (_pages.length - 1).clamp(0, 99);
+    if (_index > max) {
+      _index = max;
+    }
   }
 
   void _openChat() {
@@ -198,7 +200,13 @@ class _AdaptiveShellState extends State<AdaptiveShell>
         final s = Curves.easeOutBack.transform(_searchDetachCtrl.value);
         // Main pill items when collapsed: Home + Library
         final settings = SettingsService.instance;
-        final mainItems = _collapsed ? const [0, 3] : const [0, 1, 2, 3, 4];
+        final n = _labels.length;
+        final searchIdx = n - 1; // Search always last
+        // Library is second-to-last when no chat; with chat: Home,Browse,Chat,Library,Search → lib = n-2
+        final libraryIdx = n - 2;
+        final mainItems = _collapsed
+            ? [0, libraryIdx] // Home + Library
+            : List<int>.generate(n, (i) => i);
         final showChat = settings.flag('private_chat');
         final showMap = settings.flag('friends_map');
 
@@ -219,7 +227,7 @@ class _AdaptiveShellState extends State<AdaptiveShell>
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
                         for (final i in mainItems)
-                          if (!(i == 4 && _collapsed))
+                          if (!(_collapsed && i == searchIdx))
                             _navIcon(i, cs, compact: _collapsed),
                       ],
                     ),
@@ -242,7 +250,7 @@ class _AdaptiveShellState extends State<AdaptiveShell>
                           child: SizedBox(
                             width: 54,
                             height: 54,
-                            child: _navIcon(4, cs, compact: true, bubble: true),
+                            child: _navIcon(searchIdx, cs, compact: true, bubble: true),
                           ),
                         ),
                       ),
@@ -276,7 +284,7 @@ class _AdaptiveShellState extends State<AdaptiveShell>
               duration: const Duration(milliseconds: 240),
               curve: Curves.easeOutBack,
               child: Icon(
-                _icons[i],
+                (i >= 0 && i < _icons.length) ? _icons[i] : Icons.circle,
                 size: bubble ? 26 : (compact ? 22 : 24),
                 color: selected
                     ? cs.primary
@@ -294,7 +302,7 @@ class _AdaptiveShellState extends State<AdaptiveShell>
                       ? cs.primary
                       : cs.onSurface.withOpacity(0.5),
                 ),
-                child: Text(_labels[i]),
+                child: Text(i < _labels.length ? _labels[i] : ''),
               ),
             ],
           ],
@@ -377,11 +385,11 @@ class _AdaptiveShellState extends State<AdaptiveShell>
                 horizontal: rail ? 8 : 16, vertical: 12),
             child: Row(
               children: [
-                Icon(_icons[i],
+                Icon(i < _icons.length ? _icons[i] : Icons.circle,
                     color: selected ? cs.primary : cs.onSurface.withOpacity(0.6)),
                 if (!rail) ...[
                   const SizedBox(width: 14),
-                  Text(_labels[i],
+                  Text(i < _labels.length ? _labels[i] : '',
                       style: TextStyle(
                           fontWeight:
                               selected ? FontWeight.w700 : FontWeight.w500,
