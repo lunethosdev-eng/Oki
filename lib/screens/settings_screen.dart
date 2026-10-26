@@ -1,3 +1,4 @@
+import 'package:pokke/services/permissions_service.dart';
 import 'package:pokke/services/devices_service.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
@@ -367,7 +368,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   );
                 },
               ),
+              
               ListTile(
+                leading: const Icon(Icons.security),
+                title: const Text('Solicitar permisos'),
+                subtitle: const Text('Mic · ubicación · notificaciones'),
+                onTap: () async {
+                  await PermissionsService.requestCore();
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text('Permisos solicitados al sistema')),
+                    );
+                  }
+                },
+              ),
+ListTile(
                 leading: const Icon(Icons.settings_remote_outlined),
                 title: const Text('Control remoto'),
                 subtitle: const Text('Mando virtual si hay TV vinculada'),
