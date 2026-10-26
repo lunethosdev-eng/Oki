@@ -84,9 +84,15 @@ class _OwnerPanelScreenState extends State<OwnerPanelScreen> {
       final bytes = await File(x.path).readAsBytes();
       final name =
           'covers/${_selectedId}_${animated ? 'anim' : 'static'}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      await SupabaseService.ukiyo.storage.from('covers').uploadBinary(name, bytes);
-      final url =
-          SupabaseService.ukiyo.storage.from('covers').getPublicUrl(name);
+      // Upload to Kokoro public covers bucket (RLS-friendly)
+      final storage = SupabaseService.kokoro.storage.from('covers');
+      try {
+        await storage.uploadBinary(name, bytes);
+      } catch (_) {
+        await storage.uploadBinary(name, bytes, fileOptions:
+            const FileOptions(upsert: true));
+      }
+      final url = storage.getPublicUrl(name);
       final data = animated
           ? {'animated_cover_url': url}
           : {'cover_url': url};
