@@ -154,17 +154,18 @@ class _SearchPageState extends State<SearchPage> {
                 onSubmitted: _search,
                 textInputAction: TextInputAction.search,
                 decoration: InputDecoration(
-                  suffixIcon: IconButton(
-                    tooltip: _listening ? 'Escuchando…' : 'Buscar por voz',
-                    onPressed: _listening ? null : _voiceSearch,
-                    icon: Icon(_listening ? Icons.mic : Icons.mic_none),
-                  ),
-
                   hintText: 'Canción, artista o link…',
                   prefixIcon: const Icon(Icons.search),
-                  suffixIcon: _ctrl.text.isEmpty
-                      ? null
-                      : IconButton(
+                  suffixIcon: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        tooltip: _listening ? 'Escuchando…' : 'Buscar por voz',
+                        onPressed: _listening ? null : _voiceSearch,
+                        icon: Icon(_listening ? Icons.mic : Icons.mic_none),
+                      ),
+                      if (_ctrl.text.isNotEmpty)
+                        IconButton(
                           icon: const Icon(Icons.clear),
                           onPressed: () {
                             _ctrl.clear();
@@ -175,6 +176,8 @@ class _SearchPageState extends State<SearchPage> {
                             });
                           },
                         ),
+                    ],
+                  ),
                   filled: true,
                   fillColor: cs.surfaceContainerHighest.withOpacity(0.55),
                   border: OutlineInputBorder(
