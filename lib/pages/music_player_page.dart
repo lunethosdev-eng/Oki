@@ -3,6 +3,7 @@ import 'package:pokke/services/player_controller.dart';
 import 'package:pokke/services/devices_service.dart';
 import 'package:pokke/services/settings_service.dart';
 import 'package:pokke/widgets/tv_side_panel.dart';
+import 'package:pokke/widgets/player_background.dart';
 import 'package:pokke/screens/artist_screen.dart';
 import 'package:pokke/widgets/karaoke_lyrics.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -96,30 +97,13 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
           body: Stack(
             fit: StackFit.expand,
             children: [
-              // Background from cover
-              if (cover != null && cover.startsWith('http'))
-                Positioned.fill(
-                  child: bgMode == 'blur'
-                      ? ImageFiltered(
-                          imageFilter: ColorFilter.mode(
-                              Colors.black.withOpacity(0.45), BlendMode.darken),
-                          child: Image.network(cover, fit: BoxFit.cover),
-                        )
-                      : DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                cs.primary.withOpacity(0.35),
-                                cs.surface,
-                              ],
-                            ),
-                          ),
-                        ),
-                )
-              else
-                ColoredBox(color: cs.surface),
+              Positioned.fill(
+                child: PlayerBackground(
+                  coverUrl: cover,
+                  animatedCoverUrl: song?['animated_cover_url']?.toString(),
+                  mode: bgMode,
+                ),
+              ),
               SafeArea(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
@@ -280,27 +264,25 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                       ],
                       const SizedBox(height: 8),
                       Expanded(
-                        flex: _lyricsExpanded ? 12 : 4,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 380),
-                          curve: Curves.easeOutCubic,
-                          width: double.infinity,
-                          padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
-                          decoration: BoxDecoration(
-                            color:
-                                cs.surfaceContainerHighest.withOpacity(0.45),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: song == null
-                              ? const SizedBox.shrink()
-                              : KaraokeLyrics(
+                        flex: 5,
+                        child: song == null
+                            ? const SizedBox.shrink()
+                            : Container(
+                                width: double.infinity,
+                                padding:
+                                    const EdgeInsets.fromLTRB(4, 4, 4, 4),
+                                decoration: BoxDecoration(
+                                  color: cs.surfaceContainerHighest
+                                      .withOpacity(0.35),
+                                  borderRadius: BorderRadius.circular(18),
+                                ),
+                                // Tap anywhere → true fullscreen lyrics
+                                child: KaraokeLyrics(
                                   title: title,
                                   artist: artist,
-                                  expanded: _lyricsExpanded,
-                                  onExpandToggle: () => setState(
-                                      () => _lyricsExpanded = !_lyricsExpanded),
+                                  expanded: false,
                                 ),
-                        ),
+                              ),
                       ),
                     ],
                   ),
@@ -358,30 +340,13 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          if (cover != null && cover.startsWith('http'))
-            Positioned.fill(
-              child: bgMode == 'blur'
-                  ? ColorFiltered(
-                      colorFilter: ColorFilter.mode(
-                          Colors.black.withOpacity(0.4), BlendMode.darken),
-                      child: Image.network(cover, fit: BoxFit.cover),
-                    )
-                  : Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            cs.primary.withOpacity(0.85),
-                            cs.primary.withOpacity(0.55),
-                            Colors.black87,
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                      ),
-                    ),
-            )
-          else
-            Container(color: const Color(0xFF1a1a1a)),
+          Positioned.fill(
+            child: PlayerBackground(
+              coverUrl: cover,
+              mode: bgMode,
+              tv: true,
+            ),
+          ),
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(40, 16, 40, 28),
