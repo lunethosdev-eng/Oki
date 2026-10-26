@@ -1,3 +1,4 @@
+import 'package:pokke/services/devices_service.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:pokke/services/settings_service.dart';
@@ -199,6 +200,49 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ],
                 ),
               ),
+
+              Text('Tamaño del héroe',
+                  style: TextStyle(
+                      fontSize: 13,
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withOpacity(0.55))),
+              const SizedBox(height: 6),
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(value: 'small', label: Text('Chico')),
+                  ButtonSegment(value: 'medium', label: Text('Medio')),
+                  ButtonSegment(value: 'large', label: Text('Grande')),
+                ],
+                selected: {s.heroSize},
+                onSelectionChanged: (v) => s.setHeroSize(v.first),
+              ),
+              const SizedBox(height: 10),
+              Text('Estilo del héroe',
+                  style: TextStyle(
+                      fontSize: 13,
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withOpacity(0.55))),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                children: [
+                  for (final m in const [
+                    ('cover', 'Cover'),
+                    ('video', 'Video'),
+                    ('gradient', 'Degradado'),
+                    ('cinematic', 'Cine'),
+                  ])
+                    ChoiceChip(
+                      label: Text(m.$2),
+                      selected: s.heroStyle == m.$1,
+                      onSelected: (_) => s.setHeroStyle(m.$1),
+                    ),
+                ],
+              ),
               const SizedBox(height: 12),
               _h('Player'),
               ListTile(
@@ -332,6 +376,60 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     context,
                     MaterialPageRoute(
                         builder: (_) => const RemoteControlScreen()),
+                  );
+                },
+              ),
+              const SizedBox(height: 8),
+              Text('Sesiones / dispositivos',
+                  style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: Theme.of(context).colorScheme.onSurface)),
+              AnimatedBuilder(
+                animation: DevicesService.instance,
+                builder: (_, __) {
+                  final devs = DevicesService.instance.devices;
+                  if (devs.isEmpty) {
+                    return ListTile(
+                      dense: true,
+                      title: Text('Ninguno detectado',
+                          style: TextStyle(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurface
+                                  .withOpacity(0.45))),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.refresh),
+                        onPressed: () =>
+                            DevicesService.instance.refresh(),
+                      ),
+                    );
+                  }
+                  return Column(
+                    children: [
+                      for (final d in devs)
+                        ListTile(
+                          leading: Icon(
+                              DevicesService.instance.iconFor(d.type)),
+                          title: Text(d.name),
+                          subtitle: Text(
+                            '${d.type}'
+                            '${d.battery != null ? ' · ${d.battery}%' : ''}'
+                            '${d.active ? ' · activo' : ''}',
+                          ),
+                        ),
+                      ListTile(
+                        leading: const Icon(Icons.logout),
+                        title: const Text(
+                            'Cerrar sesión en este dispositivo'),
+                        onTap: () async {
+                          await SupabaseService.signOut();
+                          if (context.mounted) {
+                            Navigator.of(context)
+                                .popUntil((r) => r.isFirst);
+                          }
+                        },
+                      ),
+                    ],
                   );
                 },
               ),
