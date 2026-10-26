@@ -230,16 +230,28 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                             child: Text(artist,
                                 style: TextStyle(
                                     fontSize: 15,
-                                    color: cs.primary.withOpacity(0.9))),
+                                    color: cs.onSurface.withOpacity(0.75))),
                           ),
                         ),
-                        Slider(
-                          value: progress,
-                          onChanged: (v) {
-                            pc.seek(Duration(
-                                milliseconds:
-                                    (v * dur.inMilliseconds).round()));
-                          },
+                        const SizedBox(height: 8),
+                        SliderTheme(
+                          data: SliderTheme.of(context).copyWith(
+                            activeTrackColor: cs.onSurface,
+                            inactiveTrackColor: cs.onSurface.withOpacity(0.18),
+                            thumbColor: cs.onSurface,
+                            overlayColor: cs.onSurface.withOpacity(0.12),
+                            trackHeight: 2.5,
+                            thumbShape: const RoundSliderThumbShape(
+                                enabledThumbRadius: 6),
+                          ),
+                          child: Slider(
+                            value: progress.clamp(0.0, 1.0),
+                            onChanged: (v) {
+                              pc.seek(Duration(
+                                  milliseconds:
+                                      (v * dur.inMilliseconds).round()));
+                            },
+                          ),
                         ),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -254,6 +266,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                                     color: cs.onSurface.withOpacity(0.45))),
                           ],
                         ),
+                        const SizedBox(height: 4),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
@@ -261,27 +274,36 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                               onPressed: pc.toggleShuffle,
                               icon: Icon(Icons.shuffle,
                                   color: pc.shuffle
-                                      ? cs.primary
+                                      ? cs.onSurface
                                       : cs.onSurface.withOpacity(0.4)),
                             ),
                             IconButton(
                               onPressed: pc.previous,
-                              icon: const Icon(Icons.skip_previous, size: 36),
+                              icon: Icon(Icons.skip_previous,
+                                  size: 36, color: cs.onSurface),
                             ),
-                            FilledButton(
-                              onPressed: pc.toggle,
-                              style: FilledButton.styleFrom(
-                                shape: const CircleBorder(),
-                                padding: const EdgeInsets.all(16),
-                              ),
-                              child: Icon(
-                                pc.playing ? Icons.pause : Icons.play_arrow,
-                                size: 32,
+                            Material(
+                              color: cs.onSurface,
+                              shape: const CircleBorder(),
+                              child: InkWell(
+                                customBorder: const CircleBorder(),
+                                onTap: pc.toggle,
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Icon(
+                                    pc.playing
+                                        ? Icons.pause_rounded
+                                        : Icons.play_arrow_rounded,
+                                    size: 34,
+                                    color: cs.surface,
+                                  ),
+                                ),
                               ),
                             ),
                             IconButton(
                               onPressed: pc.next,
-                              icon: const Icon(Icons.skip_next, size: 36),
+                              icon: Icon(Icons.skip_next,
+                                  size: 36, color: cs.onSurface),
                             ),
                             IconButton(
                               onPressed: pc.cycleRepeat,
@@ -290,7 +312,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                                     ? Icons.repeat_one
                                     : Icons.repeat,
                                 color: pc.repeatMode > 0
-                                    ? cs.primary
+                                    ? cs.onSurface
                                     : cs.onSurface.withOpacity(0.4),
                               ),
                             ),
