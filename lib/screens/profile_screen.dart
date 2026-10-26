@@ -97,7 +97,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final isOwner = SupabaseService.isOwner;
     final bio = _profile?['bio']?.toString() ?? '';
     final banner = _profile?['banner_url']?.toString();
-    final uid = SupabaseService.userId ?? '—';
+    final uid = SupabaseService.currentUser?.id ?? '—';
     final theme = _profile?['theme']?.toString() ?? 'default';
     final frame = _profile?['frame']?.toString() ?? 'none';
     final av = _avatar;
