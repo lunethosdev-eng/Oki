@@ -1,3 +1,4 @@
+import 'package:pokke/services/catalog_service.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -104,6 +105,7 @@ class _OwnerPanelScreenState extends State<OwnerPanelScreen> {
             .from('songs')
             .update(data)
             .eq('id', _selectedId!);
+        CatalogService.instance.bump();
         if (animated) {
           _animUrl.text = urlFb;
         } else {
@@ -124,6 +126,7 @@ class _OwnerPanelScreenState extends State<OwnerPanelScreen> {
           .from('songs')
           .update(data)
           .eq('id', _selectedId!);
+        CatalogService.instance.bump();
       if (animated) {
         _animUrl.text = url;
       } else {
@@ -158,6 +161,7 @@ class _OwnerPanelScreenState extends State<OwnerPanelScreen> {
           .from('songs')
           .update(data)
           .eq('id', _selectedId!);
+        CatalogService.instance.bump();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
