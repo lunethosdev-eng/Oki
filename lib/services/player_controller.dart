@@ -134,7 +134,8 @@ class PlayerController extends ChangeNotifier {
 
   Future<void> resume() async {
     try {
-      await _player.play();
+      await _player.resume();
+      isPlaying = true;
     } catch (_) {}
     notifyListeners();
   }
