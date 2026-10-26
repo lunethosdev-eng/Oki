@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:pokke/adaptive/breakpoints.dart';
 import 'package:pokke/services/device_link_service.dart';
 import 'package:pokke/services/supabase_service.dart';
+import 'package:pokke/adaptive/adaptive_shell.dart';
 
-/// Phone: enter code from TV. TV: show code to scan/type on phone.
 class DeviceLinkScreen extends StatefulWidget {
-  /// If true, this device acts as TV host (shows code).
   final bool asTvHost;
   const DeviceLinkScreen({super.key, this.asTvHost = false});
 
@@ -19,39 +19,55 @@ class _DeviceLinkScreenState extends State<DeviceLinkScreen> {
   bool _busy = false;
   String? _shown;
   String? _msg;
+  bool _hostMode = false;
 
   @override
   void initState() {
     super.initState();
-    if (widget.asTvHost) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          final isTv = widget.asTvHost ||
-              Breakpoints.of(context) == PokkeFormFactor.tv;
-          if (isTv) _startHost();
-        }
-      });
-    } else {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+    DeviceLinkService.instance.addListener(_onLink);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final isTv = widget.asTvHost ||
+          Breakpoints.of(context) == PokkeFormFactor.tv;
+      if (isTv) {
+        setState(() => _hostMode = true);
+        _startHost();
+      }
+    });
+  }
+
+  void _onLink() {
+    if (DeviceLinkService.instance.linked && mounted) {
+      setState(() => _msg = '¡Cuenta vinculada!');
+      Future.delayed(const Duration(milliseconds: 800), () {
         if (!mounted) return;
-        if (Breakpoints.of(context) == PokkeFormFactor.tv) _startHost();
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const AdaptiveShell()),
+          (_) => false,
+        );
       });
     }
   }
 
   @override
   void dispose() {
+    DeviceLinkService.instance.removeListener(_onLink);
     _code.dispose();
     super.dispose();
   }
 
   Future<void> _startHost() async {
-    setState(() => _busy = true);
-    final c = await DeviceLinkService.instance.startTvPairing();
     setState(() {
-      _shown = c;
-      _busy = false;
+      _busy = true;
+      _hostMode = true;
     });
+    final c = await DeviceLinkService.instance.startHostPairing();
+    if (mounted) {
+      setState(() {
+        _shown = c;
+        _busy = false;
+      });
+    }
   }
 
   Future<void> _claim() async {
@@ -63,34 +79,38 @@ class _DeviceLinkScreenState extends State<DeviceLinkScreen> {
     setState(() {
       _busy = false;
       _msg = ok
-          ? 'Dispositivo vinculado. En la TV debería iniciar sesión sola.'
-          : 'Código inválido o expirado. ¿Iniciaste sesión en el teléfono?';
+          ? 'Código enviado. El otro dispositivo debería entrar solo.'
+          : 'Código inválido, expirado o ya usado. ¿Sesión iniciada aquí?';
     });
-    if (ok && mounted) {
-      await Future.delayed(const Duration(seconds: 1));
-      if (mounted) Navigator.pop(context, true);
-    }
   }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isTv = widget.asTvHost ||
-        Breakpoints.of(context) == PokkeFormFactor.tv;
+    final payload = DeviceLinkService.instance.pendingPayload ?? _shown ?? '';
 
     return Scaffold(
-      appBar: AppBar(title: Text(isTv ? 'Vincular con teléfono' : 'Vincular TV')),
+      appBar: AppBar(
+        title: Text(_hostMode ? 'Vincular este dispositivo' : 'Vincular otro dispositivo'),
+        actions: [
+          if (!_hostMode)
+            TextButton(
+              onPressed: _startHost,
+              child: const Text('Mostrar código'),
+            ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
         children: [
           Text(
-            isTv
-                ? 'En tu teléfono (ya con sesión): Settings → Vincular dispositivo e introduce este código.'
-                : 'En la TV abre Vincular dispositivo y escribe aquí el código (o el de la QR).',
+            _hostMode
+                ? 'En el teléfono donde ya iniciaste sesión: Settings → Vincular dispositivo e introduce el código, o escanea el QR.'
+                : 'En el otro dispositivo (TV / tablet) abre Vincular y genera un código. Escríbelo aquí.',
             style: TextStyle(color: cs.onSurface.withOpacity(0.6), height: 1.4),
           ),
           const SizedBox(height: 28),
-          if (isTv) ...[
+          if (_hostMode) ...[
             if (_busy && _shown == null)
               const Center(child: CircularProgressIndicator())
             else if (_shown != null) ...[
@@ -98,52 +118,33 @@ class _DeviceLinkScreenState extends State<DeviceLinkScreen> {
                 child: Text(
                   _shown!,
                   style: TextStyle(
-                    fontSize: 48,
+                    fontSize: 44,
                     fontWeight: FontWeight.w900,
-                    letterSpacing: 8,
+                    letterSpacing: 10,
                     color: cs.primary,
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               Center(
-                child: Text(
-                  'Válido 5 minutos',
-                  style: TextStyle(color: cs.onSurface.withOpacity(0.45)),
-                ),
+                child: Text('Válido 5 minutos · se actualiza solo al vincular',
+                    style: TextStyle(color: cs.onSurface.withOpacity(0.45))),
               ),
               const SizedBox(height: 24),
-              // Simple QR-like visual (payload text for scanner apps / manual)
               Center(
                 child: Container(
-                  width: 200,
-                  height: 200,
-                  alignment: Alignment.center,
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: cs.outlineVariant),
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Text(
-                      DeviceLinkService.instance.pendingPayload ?? _shown!,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Colors.black87,
-                        fontSize: 11,
-                        fontFamily: 'monospace',
-                      ),
-                    ),
+                  child: QrImageView(
+                    data: payload,
+                    version: QrVersions.auto,
+                    size: 220,
+                    backgroundColor: Colors.white,
                   ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'QR payload (escanea o copia el código de arriba)',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                    fontSize: 12, color: cs.onSurface.withOpacity(0.45)),
               ),
             ],
             const SizedBox(height: 20),
@@ -156,7 +157,7 @@ class _DeviceLinkScreenState extends State<DeviceLinkScreen> {
               Padding(
                 padding: const EdgeInsets.only(bottom: 16),
                 child: Text(
-                  'Debes iniciar sesión en el teléfono para vincular la TV.',
+                  'Debes iniciar sesión aquí para enviar la cuenta al otro dispositivo.',
                   style: TextStyle(color: cs.error),
                 ),
               ),
@@ -168,7 +169,7 @@ class _DeviceLinkScreenState extends State<DeviceLinkScreen> {
                 LengthLimitingTextInputFormatter(8),
               ],
               decoration: const InputDecoration(
-                labelText: 'Código de la TV',
+                labelText: 'Código del otro dispositivo',
                 border: OutlineInputBorder(),
               ),
             ),
