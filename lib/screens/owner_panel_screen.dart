@@ -84,12 +84,38 @@ class _OwnerPanelScreenState extends State<OwnerPanelScreen> {
       final bytes = await File(x.path).readAsBytes();
       final name =
           'covers/${_selectedId}_${animated ? 'anim' : 'static'}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      // Upload to Kokoro public covers bucket (RLS-friendly)
-      final storage = SupabaseService.kokoro.storage.from('covers');
+      // Upload to Ukiyo (music server) covers bucket
+      final storage = SupabaseService.ukiyo.storage.from('covers');
       try {
         await storage.remove([name]);
       } catch (_) {}
-      await storage.uploadBinary(name, bytes);
+      try {
+        await storage.uploadBinary(name, bytes);
+      } catch (e) {
+        // fallback Kokoro if Ukiyo RLS blocks
+        final fb = SupabaseService.kokoro.storage.from('covers');
+        try { await fb.remove([name]); } catch (_) {}
+        await fb.uploadBinary(name, bytes);
+        final urlFb = fb.getPublicUrl(name);
+        final data = animated
+            ? {'animated_cover_url': urlFb}
+            : {'cover_url': urlFb};
+        await SupabaseService.ukiyo
+            .from('songs')
+            .update(data)
+            .eq('id', _selectedId!);
+        if (animated) {
+          _animUrl.text = urlFb;
+        } else {
+          _coverUrl.text = urlFb;
+        }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Cover guardado (fallback Kokoro): $e')),
+          );
+        }
+        return;
+      }
       final url = storage.getPublicUrl(name);
       final data = animated
           ? {'animated_cover_url': url}
