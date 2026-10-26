@@ -1,3 +1,4 @@
+import 'package:pokke/services/voice_search_service.dart';
 import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -15,6 +16,8 @@ class SearchPage extends StatefulWidget {
 }
 
 class _SearchPageState extends State<SearchPage> {
+  bool _listening = false;
+
   final _ctrl = TextEditingController();
   List<Map<String, dynamic>> _results = [];
   List<Map<String, dynamic>> _suggestions = [];
@@ -48,6 +51,17 @@ class _SearchPageState extends State<SearchPage> {
     final list = [q, ..._history.where((e) => e != q)].take(12).toList();
     await p.setStringList('search_history', list);
     setState(() => _history = list);
+  }
+
+  Future<void> _voiceSearch() async {
+    setState(() => _listening = true);
+    final text = await VoiceSearchService.instance.listenOnce();
+    setState(() => _listening = false);
+    if (text != null && text.isNotEmpty && mounted) {
+      _ctrl.text = text;
+      _onChanged(text);
+      _search(text);
+    }
   }
 
   void _onChanged(String v) {
@@ -140,6 +154,12 @@ class _SearchPageState extends State<SearchPage> {
                 onSubmitted: _search,
                 textInputAction: TextInputAction.search,
                 decoration: InputDecoration(
+                  suffixIcon: IconButton(
+                    tooltip: _listening ? 'Escuchando…' : 'Buscar por voz',
+                    onPressed: _listening ? null : _voiceSearch,
+                    icon: Icon(_listening ? Icons.mic : Icons.mic_none),
+                  ),
+
                   hintText: 'Canción, artista o link…',
                   prefixIcon: const Icon(Icons.search),
                   suffixIcon: _ctrl.text.isEmpty
