@@ -5,7 +5,8 @@ import 'package:pokke/widgets/liquid_glass.dart';
 import 'package:pokke/screens/settings_screen.dart';
 import 'package:pokke/screens/profile_screen.dart';
 import 'package:pokke/pages/music_player_page.dart';
-import 'package:pokke/adaptive/responsive.dart';
+import 'package:pokke/adaptive/breakpoints.dart';
+import 'package:pokke/widgets/player_route.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -35,10 +36,26 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  void _openPlayer() {
+    final isTv = Breakpoints.of(context) == PokkeFormFactor.tv;
+    Navigator.of(context).push(
+      PlayerSlideRoute(page: MusicPlayerPage(tvMode: isTv)),
+    );
+  }
+
+  Future<void> _play(Map<String, dynamic> song, int index) async {
+    await PlayerController.instance
+        .play(song, asQueue: _songs, index: index);
+    if (!mounted) return;
+    _openPlayer();
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final isTv = Breakpoints.of(context) == PokkeFormFactor.tv;
     final compact = _scroll > 40;
+
     return NotificationListener<ScrollNotification>(
       onNotification: (n) {
         if (n.metrics.axis == Axis.vertical) {
@@ -49,154 +66,146 @@ class _HomePageState extends State<HomePage> {
       child: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
-          SliverToBoxAdapter(
-            child: SafeArea(
-              bottom: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 280),
-                  curve: Curves.easeOutCubic,
-                  height: compact ? 48 : 64,
-                  child: LiquidGlass(
-                    borderRadius: BorderRadius.circular(compact ? 16 : 20),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      child: Row(
-                        children: [
-                          Text(
-                            'Home',
-                            style: TextStyle(
-                              fontSize: compact ? 18 : 22,
-                              fontWeight: FontWeight.w800,
-                              color: cs.onSurface,
+          // Phone/tablet header only — TV uses shell chrome
+          if (!isTv)
+            SliverToBoxAdapter(
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 280),
+                    curve: Curves.easeOutCubic,
+                    height: compact ? 48 : 64,
+                    child: LiquidGlass(
+                      borderRadius:
+                          BorderRadius.circular(compact ? 16 : 20),
+                      child: Padding(
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 14),
+                        child: Row(
+                          children: [
+                            Text(
+                              'Home',
+                              style: TextStyle(
+                                fontSize: compact ? 18 : 22,
+                                fontWeight: FontWeight.w800,
+                                color: cs.onSurface,
+                              ),
                             ),
-                          ),
-                          const Spacer(),
-                          IconButton(
-                            tooltip: 'Settings',
-                            onPressed: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => const SettingsScreen()),
+                            const Spacer(),
+                            IconButton(
+                              tooltip: 'Settings',
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) =>
+                                        const SettingsScreen()),
+                              ),
+                              icon: Icon(Icons.settings_outlined,
+                                  color: cs.onSurface),
                             ),
-                            icon: Icon(Icons.settings_outlined,
-                                color: cs.onSurface.withOpacity(0.7)),
-                          ),
-                          GestureDetector(
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => const ProfileScreen()),
+                            IconButton(
+                              tooltip: 'Profile',
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) =>
+                                        const ProfileScreen()),
+                              ),
+                              icon: Icon(Icons.person_outline,
+                                  color: cs.onSurface),
                             ),
-                            child: CircleAvatar(
-                              radius: compact ? 14 : 16,
-                              backgroundColor: cs.surfaceContainerHighest,
-                              child: Icon(Icons.person,
-                                  size: compact ? 16 : 18,
-                                  color: cs.onSurface.withOpacity(0.6)),
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
-          const SliverToBoxAdapter(child: SizedBox(height: 20)),
+          if (isTv)
+            const SliverToBoxAdapter(child: SizedBox(height: 12)),
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: EdgeInsets.fromLTRB(isTv ? 28 : 16, 16, 16, 8),
               child: Text('Para ti',
                   style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: cs.onSurface)),
+                      fontSize: isTv ? 22 : 18,
+                      fontWeight: FontWeight.w800,
+                      color: isTv ? Colors.white : cs.onSurface)),
             ),
           ),
-          const SliverToBoxAdapter(child: SizedBox(height: 12)),
           if (_loading)
-            const SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.all(40),
-                child: Center(child: CircularProgressIndicator()),
-              ),
-            )
-          else if (_songs.isEmpty)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Text(
-                  'Sin canciones en catálogo todavía.\nUsa Search para encontrar música.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: cs.onSurface.withOpacity(0.45)),
-                ),
-              ),
-            )
+            const SliverFillRemaining(
+                child: Center(child: CircularProgressIndicator()))
           else
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 140),
+              padding: EdgeInsets.fromLTRB(isTv ? 24 : 12, 0, isTv ? 24 : 12, 120),
               sliver: SliverGrid(
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: gridColumns(context),
+                  crossAxisCount: isTv ? 5 : 2,
                   mainAxisSpacing: 12,
                   crossAxisSpacing: 12,
-                  childAspectRatio: 0.78,
+                  childAspectRatio: isTv ? 0.85 : 0.78,
                 ),
                 delegate: SliverChildBuilderDelegate(
-                  (ctx, i) {
+                  (context, i) {
                     final s = _songs[i];
-                    final title = s['title']?.toString() ?? 'Track';
-                    final artist = s['artist']?.toString() ?? '';
-                    final cover = s['cover_url']?.toString();
+                    final title = (s['title'] ?? 'Track').toString();
+                    final artist = (s['artist'] ?? '').toString();
+                    final cover = (s['cover_url'] ??
+                            s['cover'] ??
+                            s['image'])
+                        ?.toString();
                     return InkWell(
-                      onTap: () async {
-                        await PlayerController.instance
-                            .playSong(s, asQueue: _songs);
-                        if (context.mounted) {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => const MusicPlayerPage()),
-                          );
-                        }
-                      },
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () => _play(s, i),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(
                             child: ClipRRect(
-                              borderRadius: BorderRadius.circular(14),
-                              child: cover != null && cover.startsWith('http')
+                              borderRadius: BorderRadius.circular(12),
+                              child: cover != null &&
+                                      cover.startsWith('http')
                                   ? Image.network(cover,
                                       fit: BoxFit.cover,
-                                      width: double.infinity,
-                                      errorBuilder: (_, __, ___) =>
-                                          _coverPh(cs))
-                                  : _coverPh(cs),
+                                      width: double.infinity)
+                                  : Container(
+                                      color: isTv
+                                          ? Colors.white12
+                                          : cs.surfaceContainerHighest,
+                                      child: Icon(Icons.music_note,
+                                          color: isTv
+                                              ? Colors.white38
+                                              : cs.onSurface
+                                                  .withOpacity(0.3)),
+                                    ),
                             ),
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 6),
                           Text(title,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                   fontWeight: FontWeight.w600,
-                                  color: cs.onSurface)),
+                                  color: isTv
+                                      ? Colors.white
+                                      : cs.onSurface)),
                           Text(artist,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                   fontSize: 12,
-                                  color: cs.onSurface.withOpacity(0.45))),
+                                  color: isTv
+                                      ? Colors.white54
+                                      : cs.onSurface.withOpacity(0.5))),
                         ],
                       ),
                     );
                   },
-                  childCount: _songs.length.clamp(0, 20),
+                  childCount: _songs.length,
                 ),
               ),
             ),
@@ -204,9 +213,4 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
-
-  Widget _coverPh(ColorScheme cs) => Container(
-        color: cs.surfaceContainerHighest,
-        child: Icon(Icons.music_note, color: cs.onSurface.withOpacity(0.25)),
-      );
 }
