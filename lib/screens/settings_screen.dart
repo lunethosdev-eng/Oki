@@ -153,17 +153,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _h('Player'),
               ListTile(
                 title: const Text('Fondo del player'),
-                subtitle: Text(s.playerBgMode == 'blur' ? 'Blur del cover' : 'Colores del cover'),
+                subtitle: Text(_bgLabel(s.playerBgMode)),
               ),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: SegmentedButton<String>(
-                  segments: const [
-                    ButtonSegment(value: 'color', label: Text('Colores'), icon: Icon(Icons.palette_outlined)),
-                    ButtonSegment(value: 'blur', label: Text('Blur'), icon: Icon(Icons.blur_on)),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final m in const [
+                      ('color', 'Colores', Icons.palette_outlined),
+                      ('blur', 'Blur', Icons.blur_on),
+                      ('cinematic', 'Cine', Icons.movie_filter_outlined),
+                      ('dark', 'Oscuro', Icons.dark_mode_outlined),
+                      ('gradient', 'Degradado', Icons.gradient),
+                      ('mesh', 'Mesh', Icons.bubble_chart_outlined),
+                    ])
+                      ChoiceChip(
+                        avatar: Icon(m.$3, size: 16),
+                        label: Text(m.$2),
+                        selected: s.playerBgMode == m.$1,
+                        onSelected: (_) => s.setPlayerBgMode(m.$1),
+                      ),
                   ],
-                  selected: {s.playerBgMode},
-                  onSelectionChanged: (v) => s.setPlayerBgMode(v.first),
                 ),
               ),
               const SizedBox(height: 16),
@@ -177,6 +189,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
               
               
               
+              
+              _h('Letras'),
+              Text('Modo de animación',
+                  style: TextStyle(
+                      fontSize: 13,
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withOpacity(0.55))),
+              const SizedBox(height: 8),
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(value: 'normal', label: Text('Normal')),
+                  ButtonSegment(value: 'color', label: Text('Colorear')),
+                  ButtonSegment(value: 'emotion', label: Text('Emoción')),
+                ],
+                selected: {s.lyricsMode},
+                onSelectionChanged: (v) => s.setLyricsMode(v.first),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                s.lyricsMode == 'normal'
+                    ? 'Línea activa sin colorear letra por letra'
+                    : s.lyricsMode == 'color'
+                        ? 'Karaoke letra por letra sincronizado'
+                        : 'Palabras intensas en rojo + glow del fondo',
+                style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withOpacity(0.45)),
+              ),
+              const SizedBox(height: 16),
               _h('Dispositivos'),
               ListTile(
                 leading: const Icon(Icons.cast_connected_outlined),
@@ -188,7 +234,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     context,
                     MaterialPageRoute(
                       builder: (_) => DeviceLinkScreen(asTvHost: isTv),
-
+                    ),
+                  );
+                },
+              ),
               if (SupabaseService.isOwner)
                 ListTile(
                   leading: const Icon(Icons.admin_panel_settings_outlined),
@@ -199,10 +248,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     MaterialPageRoute(builder: (_) => const OwnerPanelScreen()),
                   ),
                 ),
-                    ),
-                  );
-                },
-              ),
               const SizedBox(height: 8),
               if (s.flag('friends_map'))
                 ListTile(
