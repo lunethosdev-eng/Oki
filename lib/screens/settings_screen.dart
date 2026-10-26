@@ -313,6 +313,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  String _bgLabel(String m) => switch (m) {
+        'blur' => 'Blur del cover',
+        'cinematic' => 'Cinemático · vignette + drift',
+        'dark' => 'Oscuro / AMOLED',
+        'gradient' => 'Degradado del cover',
+        'mesh' => 'Mesh de colores del cover',
+        _ => 'Colores del cover',
+      };
+
   String _betaLabel(String k) => {
         'listen_together': 'Listen together',
         'friends_map': 'Mapa de amigos (3D)',
