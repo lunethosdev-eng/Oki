@@ -1,3 +1,4 @@
+import 'package:pokke/services/catalog_service.dart';
 import 'package:pokke/services/voice_search_service.dart';
 import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
