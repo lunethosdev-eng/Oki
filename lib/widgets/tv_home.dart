@@ -122,6 +122,12 @@ class _TvHomeState extends State<TvHome> {
   Widget build(BuildContext context) {
     final heroSong = widget.songs.isNotEmpty ? widget.songs.first : null;
     final heroPath = SettingsService.instance.heroMediaPath;
+    final heroSize = SettingsService.instance.heroSize; // small|medium|large
+    final aspect = switch (heroSize) {
+      'small' => 3.2,
+      'large' => 1.8,
+      _ => 2.4, // medium
+    };
     final cover = heroSong?['cover_url']?.toString() ??
         heroSong?['cover']?.toString();
 
@@ -133,45 +139,7 @@ class _TvHomeState extends State<TvHome> {
       },
       child: CustomScrollView(
         slivers: [
-          // Top chrome
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(32, 20, 32, 8),
-              child: Row(
-                children: [
-                  const Text('Pokke',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 22)),
-                  const Spacer(),
-                  _focusable(
-                    onSelect: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => const SettingsScreen())),
-                    child: const Padding(
-                      padding: EdgeInsets.all(8),
-                      child: Icon(Icons.settings_outlined,
-                          color: Colors.white70),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  _focusable(
-                    onSelect: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => const ProfileScreen())),
-                    child: const Padding(
-                      padding: EdgeInsets.all(8),
-                      child: Icon(Icons.account_circle_outlined,
-                          color: Colors.white70),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          // Top chrome lives in AdaptiveShell only
           // Hero
           SliverToBoxAdapter(
             child: Padding(
@@ -179,7 +147,7 @@ class _TvHomeState extends State<TvHome> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(18),
                 child: AspectRatio(
-                  aspectRatio: 21 / 9,
+                  aspectRatio: aspect,
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
