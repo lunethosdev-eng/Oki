@@ -4,6 +4,7 @@ import 'package:pokke/services/devices_service.dart';
 import 'package:pokke/services/settings_service.dart';
 import 'package:pokke/widgets/tv_side_panel.dart';
 import 'package:pokke/widgets/player_background.dart';
+import 'package:pokke/widgets/cover_art.dart';
 import 'package:pokke/widgets/song_context_menu.dart';
 import 'package:pokke/screens/artist_screen.dart';
 import 'package:pokke/widgets/karaoke_lyrics.dart';
@@ -108,10 +109,8 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
             children: [
               Positioned.fill(
                 child: PlayerBackground(
-                  coverUrl: _useAnimatedCover
-                      ? (_animOf(song) ?? cover)
-                      : cover,
-                  animatedCoverUrl: _useAnimatedCover ? _animOf(song) : null,
+                  coverUrl: cover,
+                  animatedCoverUrl: _animOf(song),
                   mode: bgMode,
                 ),
               ),
@@ -192,18 +191,14 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                               aspectRatio: 1,
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(16),
-                                child: cover != null && cover.startsWith('http')
-                                    ? Image.network(cover, fit: BoxFit.cover)
-                                    : ColoredBox(
-                                        color: cs.surfaceContainerHighest,
-                                        child: Icon(Icons.album,
-                                            size: 80,
-                                            color: cs.onSurface.withOpacity(0.2)),
-                                      ),
+                                child: CoverArt(
+                                  url: cover,
+                                  animatedUrl: _animOf(song),
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
                               ),
                             ),
                           ),
-                        ),
                         const SizedBox(height: 16),
                         Align(
                           alignment: Alignment.centerLeft,
