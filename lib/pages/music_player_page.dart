@@ -199,6 +199,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                               ),
                             ),
                           ),
+                        ),
                         const SizedBox(height: 16),
                         Align(
                           alignment: Alignment.centerLeft,
