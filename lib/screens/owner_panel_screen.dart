@@ -78,47 +78,74 @@ class _OwnerPanelScreenState extends State<OwnerPanelScreen> {
 
   Future<void> _pickAndUpload({required bool animated}) async {
     if (_selectedId == null) return;
-    final x = await ImagePicker().pickImage(
-        source: ImageSource.gallery, maxWidth: 1600, imageQuality: 90);
+    final picker = ImagePicker();
+    // Prefer video for animated covers; still allow images
+    XFile? x;
+    if (animated) {
+      x = await picker.pickVideo(source: ImageSource.gallery);
+      x ??= await picker.pickImage(
+          source: ImageSource.gallery, maxWidth: 1600, imageQuality: 90);
+    } else {
+      x = await picker.pickImage(
+          source: ImageSource.gallery, maxWidth: 1600, imageQuality: 90);
+      // also allow mp4 as static cover if user wants looping art
+      x ??= await picker.pickVideo(source: ImageSource.gallery);
+    }
     if (x == null) return;
     try {
       final bytes = await File(x.path).readAsBytes();
+      final lower = x.path.toLowerCase();
+      final isMp4 = lower.endsWith('.mp4') ||
+          lower.endsWith('.webm') ||
+          lower.endsWith('.mov') ||
+          (x.mimeType?.startsWith('video/') ?? false);
+      final ext = isMp4
+          ? (lower.endsWith('.webm')
+              ? 'webm'
+              : lower.endsWith('.mov')
+                  ? 'mov'
+                  : 'mp4')
+          : (lower.endsWith('.png')
+              ? 'png'
+              : lower.endsWith('.webp')
+                  ? 'webp'
+                  : lower.endsWith('.gif')
+                      ? 'gif'
+                      : 'jpg');
+      final contentType = isMp4
+          ? (ext == 'webm' ? 'video/webm' : 'video/mp4')
+          : (ext == 'png'
+              ? 'image/png'
+              : ext == 'webp'
+                  ? 'image/webp'
+                  : ext == 'gif'
+                      ? 'image/gif'
+                      : 'image/jpeg');
       final name =
-          'covers/${_selectedId}_${animated ? 'anim' : 'static'}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      // Upload to Ukiyo (music server) covers bucket
-      final storage = SupabaseService.ukiyo.storage.from('covers');
-      try {
-        await storage.remove([name]);
-      } catch (_) {}
-      try {
+          'covers/${_selectedId}_${animated ? 'anim' : 'static'}_${DateTime.now().millisecondsSinceEpoch}.$ext';
+
+      Future<String> uploadTo(dynamic storage) async {
+        try {
+          await storage.remove([name]);
+        } catch (_) {}
         await storage.uploadBinary(name, bytes);
+        return storage.getPublicUrl(name) as String;
+      }
+
+      String url;
+      try {
+        final storage = SupabaseService.ukiyo.storage.from('covers');
+        url = await uploadTo(storage);
       } catch (e) {
-        // fallback Kokoro if Ukiyo RLS blocks
         final fb = SupabaseService.kokoro.storage.from('covers');
-        try { await fb.remove([name]); } catch (_) {}
-        await fb.uploadBinary(name, bytes);
-        final urlFb = fb.getPublicUrl(name);
-        final data = animated
-            ? {'animated_cover_url': urlFb}
-            : {'cover_url': urlFb};
-        await SupabaseService.ukiyo
-            .from('songs')
-            .update(data)
-            .eq('id', _selectedId!);
-        CatalogService.instance.bump();
-        if (animated) {
-          _animUrl.text = urlFb;
-        } else {
-          _coverUrl.text = urlFb;
-        }
+        url = await uploadTo(fb);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Cover guardado (fallback Kokoro): $e')),
+            SnackBar(content: Text('Cover vía Kokoro (Ukiyo falló): $e')),
           );
         }
-        return;
       }
-      final url = storage.getPublicUrl(name);
+
       final data = animated
           ? {'animated_cover_url': url}
           : {'cover_url': url};
@@ -126,7 +153,7 @@ class _OwnerPanelScreenState extends State<OwnerPanelScreen> {
           .from('songs')
           .update(data)
           .eq('id', _selectedId!);
-        CatalogService.instance.bump();
+      CatalogService.instance.bump();
       if (animated) {
         _animUrl.text = url;
       } else {
@@ -136,13 +163,16 @@ class _OwnerPanelScreenState extends State<OwnerPanelScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text(animated
-                  ? 'Cover animado subido'
-                  : 'Cover subido desde galería')),
+                  ? (isMp4
+                      ? 'Cover animado MP4 subido (loop)'
+                      : 'Cover animado subido')
+                  : (isMp4
+                      ? 'Cover MP4 subido (loop)'
+                      : 'Cover subido desde galería'))),
         );
       }
       await _load();
     } catch (e) {
-      // fallback: store URL field only if storage fails — try update with file path not useful
       if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('Upload: $e')));
