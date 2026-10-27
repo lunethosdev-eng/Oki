@@ -248,10 +248,6 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
-}
-
-
-
   String _greeting() {
     final h = DateTime.now().hour;
     if (h < 12) return 'Buenos días';
@@ -389,7 +385,7 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
-
+}
 
 class _HeaderAvatar extends StatelessWidget {
   final String? url;
